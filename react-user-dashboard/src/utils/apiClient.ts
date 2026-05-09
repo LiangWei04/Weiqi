@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5000', // Updated to local backend URL
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,16 +15,12 @@ const onRefreshed = (token: string) => {
   refreshSubscribers = [];
 };
 
-interface RefreshResponse {
-  accessToken: string;
-}
-
 const refreshAccessToken = async (): Promise<string> => {
-  const refreshToken = localStorage.getItem('refreshToken');
-  const response = await axios.post<RefreshResponse>('https://api.example.com/auth/refresh', { refreshToken });
-  const { accessToken } = response.data;
-  localStorage.setItem('authToken', accessToken);
-  return accessToken;
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    throw new Error('No token available');
+  }
+  return token;
 };
 
 apiClient.interceptors.request.use((config: any) => {
