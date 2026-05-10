@@ -1,0 +1,39 @@
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(120) NOT NULL DEFAULT 'CCA Member',
+  username VARCHAR(80) UNIQUE,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255),
+  role VARCHAR(30) NOT NULL DEFAULT 'Member',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  status VARCHAR(40) NOT NULL DEFAULT 'Pending Verification',
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  email_verification_token VARCHAR(255),
+  email_verification_expires TIMESTAMP,
+  auth_provider VARCHAR(40) NOT NULL DEFAULT 'local',
+  provider_id VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(160) NOT NULL,
+  description TEXT,
+  event_date DATE NOT NULL,
+  venue VARCHAR(160) NOT NULL,
+  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  status VARCHAR(30) NOT NULL DEFAULT 'Open',
+  requires_approval BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS event_registrations (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  status VARCHAR(30) NOT NULL DEFAULT 'Registered',
+  attended BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id, event_id)
+);
