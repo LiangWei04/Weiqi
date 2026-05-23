@@ -1,43 +1,35 @@
-# Backend Setup Instructions
+# TourneysHub CCA Management System
 
-## 1. Create a `.env` File
-Create a `.env` file in the `backend` directory with the following content:
-```
-DATABASE_URL=postgres://username:password@host:port/database
-PORT=5000
-```
-- Replace `username`, `password`, `host`, `port`, and `database` with your PostgreSQL credentials.
+This project is a PostgreSQL-backed CCA management web application for DBSP Project 1.
 
-## 2. Start the Backend
-Run the following commands to start the backend server:
-```bash
-cd backend
-npm install
-node server.js or npm start
-```
-The backend will start on `http://localhost:5000`.
+## Run
 
-## 3. Start the Frontend
-Navigate to the `react-user-dashboard` directory and run:
-```bash
+```powershell
 cd react-user-dashboard
 npm install
-npm run dev
+npm run build
+
+cd backend
+npm install
+npm start
 ```
-The frontend will start on `http://localhost:5173`.
 
-## 4. Database Table Creation
-The backend automatically creates the `users` table and populates it with a default user if the table does not exist. The default user is:
-- **Email**: `admin@example.com`
-- **Password**: `admin123`
+Open:
 
-## 5. Sign-Up and Sign-In Instructions
-### Sign-Up
-1. Navigate to `http://localhost:5173/signup`.
-2. Enter your email and password to create a new account.
+```text
+http://localhost:3000
+```
 
-### Sign-In
-1. Navigate to `http://localhost:5173/login`.
-2. Enter your email and password to log in.
+Default captain account:
 
-If you encounter any issues, please check the backend logs for errors.
+```text
+admin@example.com
+admin123
+```
+
+## Notes
+
+- The React app is built into `react-user-dashboard/dist` and served by Express on port `3000`.
+- The old backend `public` frontend has been removed to avoid duplicate frontends.
+- Authentication follows the BED CA2 middleware pattern: controller validation, bcrypt password middleware, JWT middleware, and `res.locals`.
+- Database schema is documented in `DDL.sql` and `backend/DDL.sql`.

@@ -366,7 +366,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   const publishedCompetitions = competitions.filter((competition) => competition.status !== 'Draft');
   const draftCompetitions = competitions.filter((competition) => competition.status === 'Draft');
   const selectedCategories = selectedCompetition?.categories || [];
-  const selectedId = selectedCompetition?.id || publishedCompetitions[0]?.id;
+  const selectedId = selectedCompetition?.id;
   const totalRegistrations = competitions.reduce((sum, item) => sum + Number(item.registration_count || 0), 0);
   const pendingApprovals = competitions.reduce((sum, item) => sum + Number(item.pending_count || 0), 0);
   const totalAttendance = competitions.reduce((sum, item) => sum + Number(item.attended_count || 0), 0)
@@ -423,11 +423,12 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         setUsers([]);
       }
 
-      const detailId = selectedCompetition?.status !== 'Draft'
-        ? selectedCompetition?.id
-        : nextPublishedCompetitions[0]?.id;
-      if (detailId) {
-        const detailResponse = await apiClient.get<CompetitionDetail>(`/competitions/${detailId}`);
+      const selectedCompetitionId = selectedCompetition?.id;
+      const selectedStillExists = selectedCompetitionId !== undefined
+        && selectedCompetition?.status !== 'Draft'
+        && nextPublishedCompetitions.some((competition) => competition.id === selectedCompetitionId);
+      if (selectedCompetitionId && selectedStillExists) {
+        const detailResponse = await apiClient.get<CompetitionDetail>(`/competitions/${selectedCompetitionId}`);
         setSelectedCompetition(detailResponse.data);
       } else {
         setSelectedCompetition(null);
@@ -527,16 +528,16 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   };
 
   return (
-    <main className="app-shell">
+    <main className="grid min-h-screen grid-cols-1 bg-[radial-gradient(circle_at_84%_0%,rgba(0,229,255,0.1),transparent_26%),#121212] lg:grid-cols-[260px_minmax(0,1fr)]">
       <Sidebar role={role} canManageAttendance={canManageAttendance} canManageUsers={canManageUsers} />
-      <section className="main-panel">
-        <header className="topbar">
+      <section className="min-w-0 p-5 text-white md:p-7">
+        <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="eyebrow">{pageTitles[view].eyebrow}</p>
-            <h1>{pageTitles[view].title}</h1>
-            {currentUser && <small className="muted-line">{currentUser.name} - {currentUser.email}</small>}
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">{pageTitles[view].eyebrow}</p>
+            <h1 className="m-0 text-3xl font-black tracking-normal text-white">{pageTitles[view].title}</h1>
+            {currentUser && <small className="mt-1 block text-sm font-bold text-app-muted">{currentUser.name} - {currentUser.email}</small>}
           </div>
-          <div className="topbar-actions">
+          <div className="flex flex-wrap items-center gap-2.5">
             <NotificationMenu
               notifications={notifications}
               canAnnounce={canManageAttendance}
@@ -728,27 +729,41 @@ const Sidebar = ({
   canManageAttendance: boolean;
   canManageUsers: boolean;
 }) => (
-  <aside className="sidebar">
-    <div className="brand-mark">
-      <span>TH</span>
+  <aside className="flex h-auto flex-col gap-6 border-r border-app-border bg-[#151515] p-5 lg:sticky lg:top-0 lg:h-screen lg:p-7">
+    <div className="flex items-center gap-3">
+      <span className="grid h-11 w-11 place-items-center rounded-lg bg-app-cyan font-black text-app-ink">TH</span>
       <div>
-        <strong>TourneysHub</strong>
-        <small>Weiqi CCA</small>
+        <strong className="block text-white">TourneysHub</strong>
+        <small className="mt-0.5 block text-app-muted">Weiqi CCA</small>
       </div>
     </div>
-    <nav className="side-nav" aria-label="Primary">
-      <NavLink to="/dashboard">Dashboard</NavLink>
-      <NavLink to="/events">Events</NavLink>
-      <NavLink to="/competitions">Competitions</NavLink>
-      {canManageAttendance && <NavLink to="/attendance">Attendance</NavLink>}
-      {canManageUsers && <NavLink to="/users">Users</NavLink>}
-      <NavLink to="/settings">Settings</NavLink>
+    <nav className="grid gap-2" aria-label="Primary">
+      <SideNavLink to="/dashboard">Dashboard</SideNavLink>
+      <SideNavLink to="/events">Events</SideNavLink>
+      <SideNavLink to="/competitions">Competitions</SideNavLink>
+      {canManageAttendance && <SideNavLink to="/attendance">Attendance</SideNavLink>}
+      {canManageUsers && <SideNavLink to="/users">Users</SideNavLink>}
+      <SideNavLink to="/settings">Settings</SideNavLink>
     </nav>
-    <div className="role-card">
-      <span>Signed in as</span>
-      <strong>{role}</strong>
+    <div className="mt-auto rounded-2xl border border-app-border bg-app-surface p-4">
+      <span className="block text-[0.82rem] font-bold text-app-muted">Signed in as</span>
+      <strong className="mt-1 block text-app-cyan">{role}</strong>
     </div>
   </aside>
+);
+
+const SideNavLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
+  <NavLink
+    to={to}
+    className={({ isActive }) => [
+      'rounded-md px-3.5 py-3 font-extrabold no-underline transition',
+      isActive
+        ? 'bg-app-cyan/10 text-app-cyan shadow-[inset_4px_0_0_#00e5ff]'
+        : 'text-app-muted hover:bg-app-cyan/10 hover:text-app-cyan hover:no-underline hover:shadow-[inset_4px_0_0_#00e5ff]',
+    ].join(' ')}
+  >
+    {children}
+  </NavLink>
 );
 
 const AccessNotice = ({ label }: { label: string }) => (
@@ -903,7 +918,7 @@ const OverviewMetrics = ({
   totalAttendance: number;
   attendanceRate: number;
 }) => (
-  <section id="overview" className="metric-grid" aria-label="Tournament metrics">
+  <section id="overview" className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Tournament metrics">
     <MetricCard label="Competitions" value={competitionCount} hint="Active records" />
     <MetricCard label="Events" value={eventCount} hint="CCA activities" />
     <MetricCard label="Registrations" value={totalRegistrations} hint={`${pendingApprovals} pending approval`} />
@@ -912,10 +927,10 @@ const OverviewMetrics = ({
 );
 
 const MetricCard = ({ label, value, hint }: { label: string; value: number | string; hint: string }) => (
-  <article className="metric-card">
-    <span>{label}</span>
-    <strong>{value}</strong>
-    <small>{hint}</small>
+  <article className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel">
+    <span className="block text-[0.82rem] font-extrabold text-app-muted">{label}</span>
+    <strong className="mt-2 block font-mono text-3xl font-black text-app-cyan">{value}</strong>
+    <small className="mt-1 block text-[0.82rem] font-bold text-app-muted">{hint}</small>
   </article>
 );
 
@@ -1076,16 +1091,16 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
   };
 
   return (
-    <section className="analytics-panel" aria-label="Tournament analytics">
-      <div className="analytics-hero">
+    <section className="grid gap-4" aria-label="Tournament analytics">
+      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.22),transparent_28%),linear-gradient(135deg,#1e1e1e,#121212)] p-6 shadow-panel xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
         <div>
-          <p className="eyebrow">Deep analytics</p>
-          <h2>Competition Intelligence</h2>
-          <p>
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Deep analytics</p>
+          <h2 className="m-0 text-3xl font-black tracking-normal text-white md:text-5xl">Competition Intelligence</h2>
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-app-muted">
             Signup requests, approval workload, attendance leakage and capacity pressure are aggregated directly from the event and competition tables.
           </p>
         </div>
-        <div className="insight-strip">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Insight label="Demand Leader" value={topCompetition?.title || 'No data'} detail={`${topCompetition?.fill_rate || 0}% fill rate`} />
           <Insight label="Hot Category" value={topCategory?.category_name || 'No data'} detail={`${topCategory?.demand || 0} requests`} />
           <Insight label="Main Venue" value={topVenue?.venue_name || 'No data'} detail={`${topVenue?.total_demand || 0} total demand`} />
@@ -1093,24 +1108,28 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
         </div>
       </div>
 
-      <div className="commercial-grid">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SignalCard label="Signup Conversion" value={`${conversionRate}%`} detail={`${approvedTotal}/${funnelTotal} requests approved`} tone={conversionRate >= 70 ? 'good' : 'warn'} />
         <SignalCard label="Approval Workload" value={pendingTotal} detail="requests waiting for action" tone={pendingTotal > 0 ? 'warn' : 'good'} />
         <SignalCard label="Attendance Leakage" value={attendanceLeak} detail="approved signups not present" tone={attendanceLeak > 0 ? 'danger' : 'good'} />
         <SignalCard label="Capacity Risk" value={capacityRiskCount} detail="competitions above 80% fill" tone={capacityRiskCount > 0 ? 'warn' : 'good'} />
       </div>
 
-      <div className="analytics-grid">
-        <div className="panel chart-panel chart-panel-full">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-12">
           <ChartHeader title="Registration Trend" subtitle="Daily signups plus cumulative growth. Use this to spot campaign spikes, deadline rushes, and quiet periods." />
-          <Line data={trendData} options={lineOptions} />
+          <div className="h-[360px]">
+            <Line data={trendData} options={lineOptions} />
+          </div>
         </div>
 
-        <div className="panel chart-panel ">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
           <ChartHeader title="Registration Funnel" subtitle="Request outcome for visible workflows: pending approval, approved, and rejected." />
-          <div className="chart-with-summary">
-            <Bar data={funnelData} options={horizontalBarOptions} />
-            <div className="funnel-summary">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="h-[300px]">
+              <Bar data={funnelData} options={horizontalBarOptions} />
+            </div>
+            <div className="grid gap-3">
               <Insight label="Conversion" value={`${conversionRate}%`} detail="approved out of all requests" />
               <Insight label="Queue" value={String(pendingTotal)} detail="still awaiting review" />
               <Insight label="Rejected" value={`${rejectionRate}%`} detail="rejection rate" />
@@ -1118,29 +1137,39 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
           </div>
         </div>
 
-        <div className="panel chart-panel chart-panel-tall chart-panel-wide">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-8">
           <ChartHeader title="Capacity Pressure" subtitle="Signup requests vs available seats. Requests include approved and pending competition registrations." />
-          <Bar data={capacityData} options={barOptions} />
+          <div className="h-[420px]">
+            <Bar data={capacityData} options={barOptions} />
+          </div>
         </div>
 
-        <div className="panel chart-panel chart-panel-wide">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-7">
           <ChartHeader title="Category Demand" subtitle="Approved and pending approval signups by division." />
-          <Bar data={categoryData} options={stackedBarOptions} />
+          <div className="h-[360px]">
+            <Bar data={categoryData} options={stackedBarOptions} />
+          </div>
         </div>
 
-        <div className="panel chart-panel">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-5">
           <ChartHeader title="Attendance Quality" subtitle="Low bars identify activities needing follow-up." />
-          <Bar data={attendanceData} options={percentBarOptions} />
+          <div className="h-[360px]">
+            <Bar data={attendanceData} options={percentBarOptions} />
+          </div>
         </div>
 
-        <div className="panel chart-panel chart-panel-tall">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-5">
           <ChartHeader title="Venue Pressure Map" subtitle="X: activity count, Y: demand, bubble: capacity." />
-          <Bubble data={venueData} options={bubbleOptions} />
+          <div className="h-[420px]">
+            <Bubble data={venueData} options={bubbleOptions} />
+          </div>
         </div>
 
-        <div className="panel chart-panel chart-panel-wide">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-7">
           <ChartHeader title="Event Popularity" subtitle="Approved signups, pending approval requests, and actual turnout." />
-          <Bar data={eventPopularityData} options={barOptions} />
+          <div className="h-[420px]">
+            <Bar data={eventPopularityData} options={barOptions} />
+          </div>
         </div>
       </div>
     </section>
@@ -1158,25 +1187,30 @@ const SignalCard = ({
   detail: string;
   tone: 'good' | 'warn' | 'danger';
 }) => (
-  <article className={`signal-card ${tone}`}>
-    <span>{label}</span>
-    <strong>{value}</strong>
-    <small>{detail}</small>
+  <article className={[
+    'rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel',
+    tone === 'good' ? 'border-l-4 border-l-app-green' : '',
+    tone === 'warn' ? 'border-l-4 border-l-app-amber' : '',
+    tone === 'danger' ? 'border-l-4 border-l-app-red' : '',
+  ].join(' ')}>
+    <span className="block text-[0.82rem] font-extrabold text-app-muted">{label}</span>
+    <strong className="mt-2 block font-mono text-3xl font-black text-white">{value}</strong>
+    <small className="mt-1 block text-[0.82rem] font-extrabold text-app-muted">{detail}</small>
   </article>
 );
 
 const Insight = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
-  <article>
-    <span>{label}</span>
-    <strong>{value}</strong>
-    <small>{detail}</small>
+  <article className="rounded-2xl border border-app-border bg-app-surfaceSoft p-4">
+    <span className="block text-[0.78rem] font-extrabold uppercase tracking-wide text-app-muted">{label}</span>
+    <strong className="mt-2 block truncate text-base font-black text-app-cyan" title={value}>{value}</strong>
+    <small className="mt-1 block text-[0.78rem] font-bold text-app-muted">{detail}</small>
   </article>
 );
 
 const ChartHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
-  <div className="chart-header">
-    <h3>{title}</h3>
-    <span>{subtitle}</span>
+  <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+    <h3 className="m-0 text-base font-black text-app-cyan">{title}</h3>
+    <span className="max-w-xl text-left text-[0.82rem] font-extrabold leading-5 text-app-muted md:text-right">{subtitle}</span>
   </div>
 );
 
@@ -2204,6 +2238,7 @@ const AttendancePanel = ({
   onStatusChanged: (message: string) => void;
 }) => {
   const [activityFilter, setActivityFilter] = React.useState('All');
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = React.useState('All');
   const [queueFilter, setQueueFilter] = React.useState('All');
   const [queuePage, setQueuePage] = React.useState(1);
   const [attendancePage, setAttendancePage] = React.useState(1);
@@ -2226,10 +2261,18 @@ const AttendancePanel = ({
     return queueFilter === 'All' || queueFilter === `Event: ${registration.event_title}`;
   });
   const filteredCompetitionAttendance = approvedCompetitionRegistrations.filter((registration) => {
-    return activityFilter === 'All' || activityFilter === `Competition: ${registration.competition_title}`;
+    const matchesActivity = activityFilter === 'All' || activityFilter === `Competition: ${registration.competition_title}`;
+    const matchesAttendance = attendanceStatusFilter === 'All'
+      || (attendanceStatusFilter === 'Present' && registration.attended)
+      || (attendanceStatusFilter === 'Absent' && !registration.attended);
+    return matchesActivity && matchesAttendance;
   });
   const filteredEventAttendance = approvedEventRegistrations.filter((registration) => {
-    return activityFilter === 'All' || activityFilter === `Event: ${registration.event_title}`;
+    const matchesActivity = activityFilter === 'All' || activityFilter === `Event: ${registration.event_title}`;
+    const matchesAttendance = attendanceStatusFilter === 'All'
+      || (attendanceStatusFilter === 'Present' && registration.attended)
+      || (attendanceStatusFilter === 'Absent' && !registration.attended);
+    return matchesActivity && matchesAttendance;
   });
   const queueRows = [
     ...filteredPendingCompetitionRegistrations.map((registration) => ({
@@ -2276,7 +2319,7 @@ const AttendancePanel = ({
 
   React.useEffect(() => {
     setAttendancePage(1);
-  }, [activityFilter]);
+  }, [activityFilter, attendanceStatusFilter]);
 
   const updateCompetitionStatus = async (registrationId: number, status: string) => {
     try {
@@ -2372,15 +2415,25 @@ const AttendancePanel = ({
             <h2>Approved Signups</h2>
           </div>
         </div>
-        <label className="form-field attendance-filter">
-          <span>Activity Filter</span>
-          <select value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}>
-            <option value="All">All activities</option>
-            {activityOptions.map((activity) => (
-              <option key={activity} value={activity}>{activity}</option>
-            ))}
-          </select>
-        </label>
+        <div className="attendance-filter-row">
+          <label className="form-field attendance-filter">
+            <span>Activity Filter</span>
+            <select value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}>
+              <option value="All">All activities</option>
+              {activityOptions.map((activity) => (
+                <option key={activity} value={activity}>{activity}</option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field attendance-filter">
+            <span>Attendance Filter</span>
+            <select value={attendanceStatusFilter} onChange={(event) => setAttendanceStatusFilter(event.target.value)}>
+              <option value="All">All attendance</option>
+              <option value="Present">Present only</option>
+              <option value="Absent">Absent only</option>
+            </select>
+          </label>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -2803,6 +2856,7 @@ const UsersPanel = ({
 }) => {
   const [search, setSearch] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState('All');
+  const [userPage, setUserPage] = React.useState(1);
   const [deleteTarget, setDeleteTarget] = React.useState<ManagedUser | null>(null);
   const roles = ['Captain', 'Vice-Captain', 'Secretary', 'Member'];
   const filteredUsers = users.filter((user) => {
@@ -2814,6 +2868,11 @@ const UsersPanel = ({
     const matchesRole = roleFilter === 'All' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+  const userSlice = paginate(filteredUsers, userPage, 8);
+
+  React.useEffect(() => {
+    setUserPage(1);
+  }, [roleFilter, search]);
 
   const changeRole = async (user: ManagedUser, nextRole: string) => {
     if (user.id === currentUserId) {
@@ -2881,7 +2940,7 @@ const UsersPanel = ({
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {userSlice.items.map((user) => (
               <tr key={user.id}>
                 <td>{user.name}</td>
                 <td>{user.username || '-'}</td>
@@ -2922,6 +2981,7 @@ const UsersPanel = ({
           </tbody>
         </table>
       </div>
+      <PaginationControls page={userPage} totalPages={userSlice.totalPages} onPageChange={setUserPage} />
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         title={`Delete ${deleteTarget?.email || 'user'}?`}

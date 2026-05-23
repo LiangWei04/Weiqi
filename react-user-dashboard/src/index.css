@@ -1,51 +1,54 @@
-:root {
-  color: #ffffff;
-  background: #121212;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  :root {
+    color: theme('colors.app.text');
+    background: theme('colors.app.bg');
+    font-family: theme('fontFamily.sans');
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  * {
+    box-sizing: border-box;
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top right, rgba(0, 229, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, #121212, #0b0f11),
-    #121212;
-}
+  html {
+    scroll-behavior: smooth;
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+  body {
+    @apply m-0 min-h-screen min-w-80 bg-app-bg text-app-text;
+    background:
+      radial-gradient(circle at top right, rgba(0, 229, 255, 0.12), transparent 30%),
+      linear-gradient(180deg, theme('colors.app.bg'), theme('colors.app.bgDeep')),
+      theme('colors.app.bg');
+  }
 
-button {
-  cursor: pointer;
-}
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 
-a {
-  color: #00e5ff;
-  text-decoration: none;
-}
+  button {
+    @apply cursor-pointer;
+  }
 
-a:hover {
-  text-decoration: underline;
-}
+  a {
+    @apply text-app-cyan no-underline;
+  }
 
-#root {
-  min-height: 100vh;
+  a:hover {
+    @apply underline;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
 }
