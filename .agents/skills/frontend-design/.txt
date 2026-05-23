@@ -1,0 +1,15 @@
+React and backend project structure
+Add base database schema and remove unused match/ranking tables
+Build login and signup flow
+Add email verification and OAuth authentication
+Add role permissions and protected navigation
+Build captain user management
+Add event creation and editing
+Add event registration and attendance tracking
+Add draft and publish workflow for events
+Build competition creation, categories, and editing
+Add competition registration approval and attendance
+Add dashboard analytics cards and charts
+Add notification bell, announcements, and settings
+Add hidden member participation management page
+Polish modals, draft deletion, and production build serving
