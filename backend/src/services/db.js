@@ -51,6 +51,7 @@ const ensureDatabase = async () => {
 
 module.exports = {
   ensureDatabase,
+  connect: () => pool.connect(),
   query: (text, params, callback) => {
     if (typeof params === "function") {
       return pool.query(text, params);

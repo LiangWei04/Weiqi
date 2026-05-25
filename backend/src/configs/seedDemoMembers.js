@@ -89,7 +89,7 @@ const seedEventRegistrations = async (users) => {
       }
 
       const status = statuses[(userIndex + eventIndex) % statuses.length];
-      const attended = status === "Registered" && (userIndex + eventIndex) % 4 !== 0;
+      const attended = false;
 
       await db.query(
         `
@@ -126,7 +126,7 @@ const seedCompetitionRegistrations = async (users) => {
 
     for (let categoryIndex = 0; categoryIndex < selectedCategories.length; categoryIndex += 1) {
       const status = statuses[(userIndex + categoryIndex) % statuses.length];
-      const attended = status === "Registered" && userIndex % 5 !== 0;
+      const attended = false;
 
       await db.query(
         `

@@ -1,6 +1,16 @@
 const model = require("../models/competitionModel");
 const emailService = require("../services/emailService");
 const notificationModel = require("../models/notificationModel");
+const autoRejectService = require("../services/autoRejectService");
+
+const runAutoRejections = async () => {
+  try {
+    return await autoRejectService.rejectClosedOrFullPendingRequests();
+  } catch (error) {
+    console.error("Error auto rejecting pending requests:", error);
+    return null;
+  }
+};
 
 const notifyParticipants = async ({ recipients, activityType, activityTitle, action, reason }) => {
   const userIds = recipients.map((recipient) => recipient.user_id).filter(Boolean);
@@ -76,7 +86,9 @@ module.exports.readOptions = (req, res) => {
   });
 };
 
-module.exports.readAll = (req, res) => {
+module.exports.readAll = async (req, res) => {
+  await runAutoRejections();
+
   model.selectAll((error, results) => {
     if (error) {
       console.error("Error readAll competitions:", error);
@@ -301,6 +313,55 @@ module.exports.createCategory = (req, res) => {
   });
 };
 
+module.exports.updateCategory = (req, res) => {
+  const capacity = req.body.capacity === undefined ? undefined : Number(req.body.capacity);
+  const registrationFee = req.body.registrationFee === undefined ? undefined : Number(req.body.registrationFee);
+
+  if (capacity !== undefined && (!Number.isInteger(capacity) || capacity <= 0)) {
+    return res.status(400).json({ message: "Capacity must be a positive whole number" });
+  }
+
+  if (registrationFee !== undefined && registrationFee < 0) {
+    return res.status(400).json({ message: "Registration fee cannot be negative" });
+  }
+
+  const data = {
+    category_id: req.params.category_id,
+    name: req.body.name || undefined,
+    capacity,
+    registration_fee: registrationFee,
+  };
+
+  model.updateCategory(data, (error, results) => {
+    if (error) {
+      console.error("Error updateCategory:", error);
+      return res.status(500).json(error);
+    }
+
+    if (results.rows.length > 0) {
+      return res.status(200).json({
+        message: "Category updated",
+        category: results.rows[0],
+      });
+    }
+
+    model.selectCategoryById(data, (selectError, selectResults) => {
+      if (selectError) {
+        console.error("Error selectCategoryById:", selectError);
+        return res.status(500).json(selectError);
+      }
+
+      if (selectResults.rows.length === 0) {
+        return res.status(404).json({ message: "Competition category not found" });
+      }
+
+      return res.status(400).json({
+        message: `Capacity cannot be lower than ${selectResults.rows[0].active_signups} active signup(s)`,
+      });
+    });
+  });
+};
+
 module.exports.registerForCategory = (req, res) => {
   const data = {
     user_id: res.locals.userId,
@@ -320,6 +381,14 @@ module.exports.registerForCategory = (req, res) => {
     const category = infoResults.rows[0];
     if (category.competition_status !== "Open") {
       return res.status(400).json({ message: "Competition is not open for registration" });
+    }
+
+    if (category.registration_closes_at && new Date(category.registration_closes_at) < new Date()) {
+      return res.status(400).json({ message: "Registration deadline has closed for this competition" });
+    }
+
+    if (category.registration_closed) {
+      return res.status(400).json({ message: "Registration is closed because tournament pairings have started" });
     }
 
     if (category.existing_competition_registration_status) {
@@ -352,7 +421,9 @@ module.exports.registerForCategory = (req, res) => {
   });
 };
 
-module.exports.readRegistrations = (req, res) => {
+module.exports.readRegistrations = async (req, res) => {
+  await runAutoRejections();
+
   model.selectRegistrations((error, results) => {
     if (error) {
       console.error("Error read competition registrations:", error);
@@ -363,13 +434,15 @@ module.exports.readRegistrations = (req, res) => {
   });
 };
 
-module.exports.updateRegistrationStatus = (req, res) => {
+module.exports.updateRegistrationStatus = async (req, res) => {
   const allowedStatuses = ["Pending Approval", "Registered", "Waitlisted", "Rejected", "Withdrawn"];
   const status = req.body.status;
 
   if (!allowedStatuses.includes(status)) {
     return res.status(400).json({ message: "Invalid registration status" });
   }
+
+  await runAutoRejections();
 
   model.updateRegistrationStatus(
     {
@@ -383,13 +456,14 @@ module.exports.updateRegistrationStatus = (req, res) => {
       }
 
       if (results.rows.length === 0) {
-        return res.status(404).json({ message: "Registration not found" });
+        return res.status(404).json({ message: "Registration not found, or it was auto-rejected because registration is closed/full" });
       }
 
-      return res.status(200).json({
+      runAutoRejections().then((autoRejected) => res.status(200).json({
         message: "Registration status updated",
         registration: results.rows[0],
-      });
+        autoRejected,
+      }));
     }
   );
 };
@@ -399,6 +473,7 @@ module.exports.updateRegistrationAttendance = (req, res) => {
     {
       registration_id: req.params.registration_id,
       attended: Boolean(req.body.attended),
+      role: res.locals.role,
     },
     (error, results) => {
       if (error) {
@@ -407,7 +482,9 @@ module.exports.updateRegistrationAttendance = (req, res) => {
       }
 
       if (results.rows.length === 0) {
-        return res.status(404).json({ message: "Registration not found or not approved yet" });
+        return res.status(400).json({
+          message: "Attendance can only be marked on the competition day. After the competition, ask the Captain to update it.",
+        });
       }
 
       return res.status(200).json(results.rows[0]);
@@ -428,4 +505,65 @@ module.exports.deleteRegistration = (req, res) => {
 
     return res.status(200).json({ message: "Competition registration removed" });
   });
+};
+
+module.exports.readTournament = async (req, res) => {
+  try {
+    const tournament = await model.selectTournament({
+      competition_id: req.params.competition_id,
+    });
+    return res.status(200).json(tournament);
+  } catch (error) {
+    console.error("Error readTournament:", error);
+    return res.status(500).json(error);
+  }
+};
+
+module.exports.generateRound = async (req, res) => {
+  try {
+    const result = await model.generateRound({
+      competition_id: req.params.competition_id,
+      category_id: req.params.category_id,
+      generated_by: res.locals.userId,
+    });
+
+    return res.status(201).json({
+      message: `Round ${result.round.round_number} pairings generated`,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Error generateRound:", error);
+    return res.status(error.statusCode || 500).json({ message: error.message || "Could not generate round" });
+  }
+};
+
+module.exports.updateMatchResult = async (req, res) => {
+  const allowedResults = ["Scheduled", "Black Win", "White Win", "Bye", "Forfeit Black", "Forfeit White"];
+  if (!allowedResults.includes(req.body.result)) {
+    return res.status(400).json({ message: "Invalid match result" });
+  }
+
+  try {
+    const match = await model.updateMatchResult({
+      match_id: req.params.match_id,
+      result: req.body.result,
+    });
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    await model.recordRankingSnapshot({
+      competition_id: match.competition_id,
+      category_id: match.category_id,
+    });
+
+    return res.status(200).json({
+      message: "Match result updated",
+      match,
+    });
+  } catch (error) {
+    console.error("Error updateMatchResult:", error);
+    return res.status(500).json(error);
+  }
 };

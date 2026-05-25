@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
+  ArcElement,
   BarElement,
   CategoryScale,
   Chart as ChartJS,
@@ -12,10 +13,11 @@ import {
   Tooltip,
 } from 'chart.js';
 import type { ChartData, ChartOptions } from 'chart.js';
-import { Bar, Bubble, Line } from 'react-chartjs-2';
+import { Bar, Bubble, Doughnut, Line } from 'react-chartjs-2';
 import apiClient from '../utils/apiClient';
 
 ChartJS.register(
+  ArcElement,
   BarElement,
   CategoryScale,
   Filler,
@@ -65,6 +67,7 @@ interface Category {
   registration_fee: string;
   min_age: number | null;
   max_age: number | null;
+  registration_closed?: boolean;
   current_user_registration_status?: string | null;
 }
 
@@ -85,6 +88,7 @@ interface Registration {
   category_name: string;
   competition_id: number;
   competition_title: string;
+  competition_start_date: string;
   participant_username?: string | null;
   participant_role?: string | null;
   school?: string | null;
@@ -97,6 +101,7 @@ interface EventItem {
   title: string;
   description: string;
   event_date: string;
+  registration_deadline: string | null;
   venue: string;
   capacity: number;
   status: string;
@@ -116,6 +121,7 @@ interface EventRegistration {
   member_name: string;
   member_email: string;
   event_title: string;
+  event_date: string;
   requires_approval: boolean;
   member_username?: string | null;
   member_role?: string | null;
@@ -236,6 +242,88 @@ interface DashboardStats {
   competition_attendance: AttendancePoint[];
 }
 
+interface MemberActivityStat {
+  activity_type: 'Event' | 'Competition';
+  title: string;
+  detail: string | null;
+  activity_date: string;
+  venue: string | null;
+  status: string;
+  attended: boolean;
+}
+
+interface MemberTrendPoint {
+  month: string;
+  total: number;
+}
+
+interface MemberOpponentRecord {
+  opponent_id: number;
+  opponent_name: string;
+  played: number;
+  wins: number;
+  losses: number;
+  last_played: string | null;
+}
+
+interface MemberRecentMatch {
+  competition_title: string;
+  category_name: string;
+  round_number: number;
+  table_number: number;
+  opponent_name: string | null;
+  outcome: string;
+  completed_at: string | null;
+}
+
+interface MemberCompetitionAchievement {
+  competition_title: string;
+  category_name: string;
+  round_number: number;
+  rank_position: number;
+  mms: number;
+  sos: number;
+  sosos: number;
+  wins: number;
+  losses: number;
+}
+
+interface MemberStats {
+  total_registrations: number;
+  event_registrations: number;
+  competition_registrations: number;
+  approved_event_registrations: number;
+  approved_competition_registrations: number;
+  approved_registrations: number;
+  pending_registrations: number;
+  waitlisted_registrations: number;
+  rejected_registrations: number;
+  attended_count: number;
+  attended_event_count: number;
+  attended_competition_count: number;
+  attendance_rate: number;
+  upcoming_count: number;
+  competition_matches_played: number;
+  competition_match_wins: number;
+  competition_match_losses: number;
+  competition_byes: number;
+  competition_win_rate: number;
+  first_place_count: number;
+  second_place_count: number;
+  third_place_count: number;
+  top5_count: number;
+  top10_count: number;
+  best_finish: number | null;
+  status_breakdown: NamedTotal[];
+  type_breakdown: NamedTotal[];
+  monthly_activity: MemberTrendPoint[];
+  competition_result_breakdown: NamedTotal[];
+  opponent_records: MemberOpponentRecord[];
+  recent_matches: MemberRecentMatch[];
+  competition_achievements: MemberCompetitionAchievement[];
+  upcoming_activities: MemberActivityStat[];
+}
+
 interface UserSettings {
   notifyRegistrationUpdate: boolean;
   notifyEventReminder: boolean;
@@ -272,6 +360,64 @@ interface MyActivity {
   status: string;
   attended: boolean;
   category_name: string | null;
+}
+
+interface TournamentStanding {
+  user_id: number;
+  player_number: number;
+  name: string;
+  school: string | null;
+  rank_type: string | null;
+  rank_value: number | null;
+  mms: number;
+  sos: number;
+  sosos: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  rank_position: number;
+  rounds: Record<string, string>;
+}
+
+interface TournamentMatch {
+  id: number;
+  round_id: number;
+  round_number: number;
+  table_number: number;
+  black_user_id: number | null;
+  white_user_id: number | null;
+  black_name: string | null;
+  white_name: string | null;
+  handicap: number;
+  result: string;
+}
+
+interface TournamentRound {
+  id: number;
+  category_id: number;
+  round_number: number;
+  status: string;
+}
+
+interface TournamentCategory {
+  id: number;
+  name: string;
+  capacity: number;
+  player_count: number;
+  standings: TournamentStanding[];
+  rounds: TournamentRound[];
+  matches: TournamentMatch[];
+  insights: {
+    completed_matches: number;
+    scheduled_matches: number;
+    completion_rate: number;
+    tied_leaders: number;
+    no_result_matches: number;
+  };
+}
+
+interface TournamentData {
+  categories: TournamentCategory[];
 }
 
 const eventManagerRoles = new Set(['Captain', 'Vice-Captain']);
@@ -330,6 +476,8 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   const [myActivities, setMyActivities] = React.useState<MyActivity[]>([]);
   const [options, setOptions] = React.useState<OptionsResponse>({ venues: [], tournament_formats: [], scoring_systems: [] });
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
+  const [memberStats, setMemberStats] = React.useState<MemberStats | null>(null);
+  const [dashboardTab, setDashboardTab] = React.useState<'club' | 'personal'>('club');
   const [message, setMessage] = React.useState('');
   const [toasts, setToasts] = React.useState<Array<{ id: number; message: string }>>([]);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
@@ -385,12 +533,18 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         apiClient.get<EventItem[]>('/events'),
         apiClient.get<OptionsResponse>('/competitions/options'),
       ]);
-      const statsResponse = await apiClient.get<DashboardStats>('/dashboard/stats');
+      const dashboardStatsPromise = canLoadManagementData
+        ? Promise.all([
+          apiClient.get<DashboardStats>('/dashboard/stats'),
+          apiClient.get<MemberStats>('/dashboard/member-stats'),
+        ])
+        : apiClient.get<MemberStats>('/dashboard/member-stats');
       const settingsResponse = await apiClient.get<UserSettings>('/users/me/settings');
       const [notificationResponse, myActivityResponse] = await Promise.all([
         apiClient.get<AppNotification[]>('/notifications'),
         apiClient.get<MyActivity[]>('/notifications/my-activities'),
       ]);
+      const dashboardStatsResponse = await dashboardStatsPromise;
 
       const nextCompetitions = competitionResponse.data;
       const nextPublishedCompetitions = nextCompetitions.filter((competition) => competition.status !== 'Draft');
@@ -399,7 +553,17 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
       setCompetitions(nextCompetitions);
       setEvents(eventResponse.data);
       setOptions(optionsResponse.data);
-      setStats(statsResponse.data);
+      if (canLoadManagementData) {
+        const [clubStatsResponse, personalStatsResponse] = dashboardStatsResponse as [
+          { data: DashboardStats },
+          { data: MemberStats },
+        ];
+        setStats(clubStatsResponse.data);
+        setMemberStats(personalStatsResponse.data);
+      } else {
+        setStats(null);
+        setMemberStats((dashboardStatsResponse as { data: MemberStats }).data);
+      }
       setUserSettings(settingsResponse.data);
       setNotifications(notificationResponse.data);
       setMyActivities(myActivityResponse.data);
@@ -553,17 +717,43 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         <ToastStack toasts={toasts} onClose={dismissToast} />
 
         {view === 'analytics' && (
-          <>
-            <OverviewMetrics
-              competitionCount={competitions.length}
-              totalRegistrations={totalRegistrations}
-              pendingApprovals={pendingApprovals}
-              eventCount={events.length}
-              totalAttendance={totalAttendance}
-              attendanceRate={attendanceRate}
-            />
-            {stats && <AnalyticsDashboard stats={stats} />}
-          </>
+          canManageAttendance ? (
+            <>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={dashboardTab === 'club' ? 'primary-action compact' : 'secondary-action compact'}
+                  onClick={() => setDashboardTab('club')}
+                >
+                  Club Analytics
+                </button>
+                <button
+                  type="button"
+                  className={dashboardTab === 'personal' ? 'primary-action compact' : 'secondary-action compact'}
+                  onClick={() => setDashboardTab('personal')}
+                >
+                  My Activity
+                </button>
+              </div>
+              {dashboardTab === 'club' ? (
+                <>
+                  <OverviewMetrics
+                    competitionCount={competitions.length}
+                    totalRegistrations={totalRegistrations}
+                    pendingApprovals={pendingApprovals}
+                    eventCount={events.length}
+                    totalAttendance={totalAttendance}
+                    attendanceRate={attendanceRate}
+                  />
+                  {stats && <AnalyticsDashboard stats={stats} />}
+                </>
+              ) : (
+                <MemberStatsDashboard stats={memberStats} currentUser={currentUser} />
+              )}
+            </>
+          ) : (
+            <MemberStatsDashboard stats={memberStats} currentUser={currentUser} />
+          )
         )}
 
         {view === 'events' && (
@@ -656,6 +846,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               registrations={registrations}
               eventRegistrations={eventRegistrations}
               canApprove={canCreateEvents}
+              currentRole={role}
               onStatusChanged={(nextMessage) => reloadWithMessage(nextMessage)}
             />
           ) : (
@@ -670,6 +861,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               eventRegistrations={eventRegistrations}
               canApprove={canCreateEvents}
               canDelete={canCreateEvents}
+              currentRole={role}
               onChanged={(nextMessage) => reloadWithMessage(nextMessage)}
             />
           ) : (
@@ -925,6 +1117,313 @@ const OverviewMetrics = ({
     <MetricCard label="Attendance" value={`${attendanceRate}%`} hint={`${totalAttendance} marked present`} />
   </section>
 );
+
+const MemberStatsDashboard = ({
+  stats,
+  currentUser,
+}: {
+  stats: MemberStats | null;
+  currentUser: CurrentUser | null;
+}) => {
+  if (!stats) {
+    return (
+      <section className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-panel">
+        <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
+        <h2 className="m-0 text-2xl font-black text-white">Loading your activity stats</h2>
+      </section>
+    );
+  }
+
+  const statusItems = stats.status_breakdown.length > 0
+    ? stats.status_breakdown
+    : [{ status: 'No registrations yet', total: 0 }];
+  const typeItems = stats.type_breakdown.length > 0
+    ? stats.type_breakdown
+    : [{ name: 'No activity yet', total: 0 }];
+  const missedApproved = Math.max(stats.approved_registrations - stats.attended_count, 0);
+  const trendItems = stats.monthly_activity.length > 0
+    ? stats.monthly_activity
+    : [{ month: new Date().toISOString(), total: 0 }];
+  const statusData: ChartData<'doughnut'> = {
+    labels: statusItems.map((item) => item.status || 'Unknown'),
+    datasets: [{
+      data: statusItems.map((item) => item.total),
+      backgroundColor: [chartPalette.green, chartPalette.amber, chartPalette.red, chartPalette.blue, chartPalette.purple],
+      borderColor: '#1e1e1e',
+      borderWidth: 2,
+    }],
+  };
+  const typeData: ChartData<'bar'> = {
+    labels: typeItems.map((item) => item.name || 'Unknown'),
+    datasets: [{
+      label: 'Registrations',
+      data: typeItems.map((item) => item.total),
+      backgroundColor: [chartPalette.cyan, chartPalette.green],
+      borderRadius: 8,
+    }],
+  };
+  const attendanceData: ChartData<'doughnut'> = {
+    labels: ['Present', 'Not marked'],
+    datasets: [{
+      data: [stats.attended_count, missedApproved],
+      backgroundColor: [chartPalette.green, 'rgba(255,255,255,0.12)'],
+      borderColor: '#1e1e1e',
+      borderWidth: 2,
+    }],
+  };
+  const attendanceByTypeData: ChartData<'bar'> = {
+    labels: ['Events', 'Competitions'],
+    datasets: [
+      {
+        label: 'Approved signups',
+        data: [stats.approved_event_registrations, stats.approved_competition_registrations],
+        backgroundColor: 'rgba(0, 229, 255, 0.28)',
+        borderColor: chartPalette.cyan,
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: 'Marked present',
+        data: [stats.attended_event_count, stats.attended_competition_count],
+        backgroundColor: chartPalette.green,
+        borderRadius: 8,
+      },
+    ],
+  };
+  const trendData: ChartData<'line'> = {
+    labels: trendItems.map((item) => formatMonth(item.month)),
+    datasets: [{
+      label: 'Signups',
+      data: trendItems.map((item) => item.total),
+      borderColor: chartPalette.cyan,
+      backgroundColor: 'rgba(0, 229, 255, 0.14)',
+      pointBackgroundColor: chartPalette.cyan,
+      pointBorderColor: '#121212',
+      pointRadius: 5,
+      tension: 0.35,
+      fill: true,
+    }],
+  };
+  const resultItems = stats.competition_result_breakdown.filter((item) => item.total > 0);
+  const competitionResultData: ChartData<'doughnut'> = {
+    labels: resultItems.length > 0 ? resultItems.map((item) => item.status || 'Unknown') : ['No results'],
+    datasets: [{
+      data: resultItems.length > 0 ? resultItems.map((item) => item.total) : [1],
+      backgroundColor: resultItems.length > 0 ? [chartPalette.green, chartPalette.red, chartPalette.blue] : ['rgba(255,255,255,0.12)'],
+      borderColor: '#1e1e1e',
+      borderWidth: 2,
+    }],
+  };
+  const opponentData: ChartData<'bar'> = {
+    labels: stats.opponent_records.slice(0, 6).map((item) => item.opponent_name),
+    datasets: [
+      {
+        label: 'Wins',
+        data: stats.opponent_records.slice(0, 6).map((item) => item.wins),
+        backgroundColor: chartPalette.green,
+        borderRadius: 8,
+      },
+      {
+        label: 'Losses',
+        data: stats.opponent_records.slice(0, 6).map((item) => item.losses),
+        backgroundColor: chartPalette.red,
+        borderRadius: 8,
+      },
+    ],
+  };
+  const achievementData: ChartData<'bar'> = {
+    labels: ['1st', '2nd', '3rd', 'Top 5', 'Top 10'],
+    datasets: [{
+      label: 'Finishes',
+      data: [
+        stats.first_place_count,
+        stats.second_place_count,
+        stats.third_place_count,
+        stats.top5_count,
+        stats.top10_count,
+      ],
+      backgroundColor: [chartPalette.amber, chartPalette.cyan, chartPalette.green, chartPalette.blue, chartPalette.purple],
+      borderRadius: 8,
+    }],
+  };
+
+  return (
+    <section className="grid gap-4" aria-label="Member dashboard">
+      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.18),transparent_28%),linear-gradient(135deg,#1e1e1e,#121212)] p-6 shadow-panel lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
+          <h2 className="m-0 text-3xl font-black text-white md:text-5xl">My CCA Activity</h2>
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-app-muted">
+            {currentUser?.name || 'Member'}, this view only shows your own event and competition registrations, approval status and attendance.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-app-border bg-app-surfaceSoft p-5">
+          <span className="block text-[0.78rem] font-extrabold uppercase tracking-wide text-app-muted">Attendance rate</span>
+          <strong className="mt-2 block font-mono text-5xl font-black text-app-cyan">{stats.attendance_rate}%</strong>
+          <small className="mt-1 block text-sm font-bold text-app-muted">
+            {stats.attended_count} marked present from {stats.approved_registrations} approved signup(s)
+          </small>
+        </div>
+      </div>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="My Signups" value={stats.total_registrations} hint={`${stats.upcoming_count} upcoming`} />
+        <MetricCard label="Events" value={stats.event_registrations} hint="event registrations" />
+        <MetricCard label="Competitions" value={stats.competition_registrations} hint="competition entries" />
+        <MetricCard label="Pending" value={stats.pending_registrations} hint="waiting for approval" />
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Match Win Rate" value={`${stats.competition_win_rate}%`} hint={`${stats.competition_match_wins}/${stats.competition_matches_played} decided games won`} />
+        <MetricCard label="Match Record" value={`${stats.competition_match_wins}-${stats.competition_match_losses}`} hint={`${stats.competition_byes} bye win(s)`} />
+        <MetricCard label="Best Finish" value={stats.best_finish ? `#${stats.best_finish}` : '-'} hint="best latest standing" />
+        <MetricCard label="Achievements" value={stats.top10_count} hint={`${stats.first_place_count} first, ${stats.top5_count} top 5`} />
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Competition Results" subtitle="Win, loss and bye outcomes from recorded pairings." />
+          <div className="h-[280px]">
+            <Doughnut data={competitionResultData} options={doughnutOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Opponent Record" subtitle="Who you have beaten or lost to most often." />
+          <div className="h-[280px]">
+            <Bar data={opponentData} options={barOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Finishes" subtitle="Placements from saved ranking records." />
+          <div className="h-[280px]">
+            <Bar data={achievementData} options={barOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-6">
+          <ChartHeader title="Recent Match History" subtitle="Your latest pairings and results across competitions." />
+          <div className="grid gap-3">
+            {stats.recent_matches.map((match) => (
+              <article key={`${match.competition_title}-${match.round_number}-${match.table_number}-${match.opponent_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <strong className="block text-white">{match.competition_title}</strong>
+                    <small className="text-app-muted">{match.category_name} - Round {match.round_number}, Table {match.table_number}</small>
+                  </div>
+                  <span className={match.outcome === 'Win' ? 'status-pill' : match.outcome === 'Loss' ? 'status-pill danger' : 'status-pill warning'}>{match.outcome}</span>
+                </div>
+                <small className="text-app-muted">Opponent: {match.opponent_name || 'Bye'}</small>
+              </article>
+            ))}
+            {stats.recent_matches.length === 0 && <p className="empty-state">No competition results have been recorded yet.</p>}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-6">
+          <ChartHeader title="Achievement Records" subtitle="Your latest recorded standing for each competition category." />
+          <div className="grid gap-3">
+            {stats.competition_achievements.map((achievement) => (
+              <article key={`${achievement.competition_title}-${achievement.category_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <strong className="block text-white">{achievement.competition_title}</strong>
+                    <small className="text-app-muted">{achievement.category_name} - Round {achievement.round_number}</small>
+                  </div>
+                  <span className="status-pill">#{achievement.rank_position}</span>
+                </div>
+                <dl className="grid grid-cols-3 gap-3 text-sm">
+                  <div><dt className="font-extrabold text-app-muted">MMS</dt><dd className="m-0 font-black text-white">{achievement.mms}</dd></div>
+                  <div><dt className="font-extrabold text-app-muted">SOS</dt><dd className="m-0 font-black text-white">{achievement.sos}</dd></div>
+                  <div><dt className="font-extrabold text-app-muted">Record</dt><dd className="m-0 font-black text-white">{achievement.wins}-{achievement.losses}</dd></div>
+                </dl>
+              </article>
+            ))}
+            {stats.competition_achievements.length === 0 && <p className="empty-state">No ranking records have been saved yet. Results will create standings snapshots.</p>}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-7">
+          <ChartHeader title="My Participation Trend" subtitle="Monthly signups from your own event and competition registrations." />
+          <div className="h-[330px]">
+            <Line data={trendData} options={lineOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-5">
+          <ChartHeader title="My Attendance" subtitle="Present count against your approved registrations." />
+          <div className="grid items-center gap-4 sm:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="h-[220px]">
+              <Doughnut data={attendanceData} options={doughnutOptions} />
+            </div>
+            <div className="grid gap-3">
+              <Insight label="Present" value={String(stats.attended_count)} detail="marked by exco" />
+              <Insight label="Not Marked" value={String(missedApproved)} detail="approved but not present yet" />
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Registration Status" subtitle="Your approval state across activities." />
+          <div className="h-[280px]">
+            <Doughnut data={statusData} options={doughnutOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Activity Mix" subtitle="How your participation splits between CCA events and competitions." />
+          <div className="h-[280px]">
+            <Bar data={typeData} options={barOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Attendance By Type" subtitle="Competition attendance is separated from normal event turnout." />
+          <div className="h-[280px]">
+            <Bar data={attendanceByTypeData} options={barOptions} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Upcoming For Me" subtitle="Only your active registrations are listed here." />
+          <div className="grid gap-3">
+            {stats.upcoming_activities.map((activity) => (
+              <article key={`${activity.activity_type}-${activity.title}-${activity.activity_date}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-wide text-app-cyan">{activity.activity_type}</span>
+                    <h3 className="m-0 mt-1 text-base font-black text-white">{activity.title}</h3>
+                  </div>
+                  <span className="status-pill">{activity.status}</span>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="font-extrabold text-app-muted">Date</dt>
+                    <dd className="m-0 font-black text-white">{formatDate(activity.activity_date)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-extrabold text-app-muted">Venue</dt>
+                    <dd className="m-0 font-black text-white">{activity.venue || '-'}</dd>
+                  </div>
+                  {activity.detail && (
+                    <div className="col-span-2">
+                      <dt className="font-extrabold text-app-muted">Category</dt>
+                      <dd className="m-0 font-black text-white">{activity.detail}</dd>
+                    </div>
+                  )}
+                </dl>
+              </article>
+            ))}
+            {stats.upcoming_activities.length === 0 && (
+              <p className="empty-state">You have no upcoming event or competition registrations.</p>
+            )}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+};
 
 const MetricCard = ({ label, value, hint }: { label: string; value: number | string; hint: string }) => (
   <article className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel">
@@ -1288,6 +1787,13 @@ const horizontalBarOptions: ChartOptions<'bar'> = {
   },
 };
 
+const doughnutOptions: ChartOptions<'doughnut'> = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '62%',
+  plugins: chartTextPlugin,
+};
+
 const EventsPanel = ({
   events,
   canCreateEvents,
@@ -1341,7 +1847,11 @@ const EventsPanel = ({
           const fillRate = eventItem.capacity === 0 ? 0 : Math.round((activeSignups / eventItem.capacity) * 100);
           const attendanceRate = eventItem.registered === 0 ? 0 : Math.round((eventItem.attended / eventItem.registered) * 100);
           const ownStatus = eventItem.current_user_registration_status;
-          const canRegister = !ownStatus && eventItem.status === 'Open' && activeSignups < eventItem.capacity;
+          const registrationClosed = isPastDate(eventItem.registration_deadline);
+          const canRegister = !ownStatus && eventItem.status === 'Open' && !registrationClosed && activeSignups < eventItem.capacity;
+          const registerLabel = registrationClosed && ownStatus !== 'Registered'
+            ? 'Registration Closed'
+            : ownStatus || (activeSignups >= eventItem.capacity ? 'Full' : 'Register');
           return (
             <article className="event-card" key={eventItem.id}>
               <div>
@@ -1351,13 +1861,14 @@ const EventsPanel = ({
               </div>
               <dl className="detail-grid compact-details">
                 <div><dt>Date</dt><dd>{formatDate(eventItem.event_date)}</dd></div>
+                <div><dt>Register By</dt><dd>{eventItem.registration_deadline ? formatDate(eventItem.registration_deadline) : '-'}</dd></div>
                 <div><dt>Venue</dt><dd>{eventItem.venue}</dd></div>
                 <div><dt>Signups</dt><dd>{activeSignups}/{eventItem.capacity} ({fillRate}%)</dd></div>
                 <div><dt>Attendance</dt><dd>{eventItem.attended}/{eventItem.registered} ({attendanceRate}%)</dd></div>
               </dl>
               <div className="event-actions">
                 <button type="button" className="secondary-action compact" disabled={!canRegister} onClick={() => registerForEvent(eventItem)}>
-                  {ownStatus || (activeSignups >= eventItem.capacity ? 'Full' : 'Register')}
+                  {registerLabel}
                 </button>
                 {canCreateEvents && (
                   <button type="button" className="secondary-action compact" onClick={() => setEditingEvent(eventItem)}>
@@ -1605,6 +2116,7 @@ const EventManagementForm = ({
     title: eventItem.title,
     description: eventItem.description || '',
     eventDate: toDateInput(eventItem.event_date),
+    registrationDeadline: toDateInput(eventItem.registration_deadline || ''),
     venue: eventItem.venue,
     capacity: String(eventItem.capacity),
     status: eventItem.status,
@@ -1620,6 +2132,7 @@ const EventManagementForm = ({
       title: form.title,
       description: form.description,
       eventDate: form.eventDate,
+      registrationDeadline: form.registrationDeadline,
       venue: form.venue,
       capacity: Number(form.capacity),
       status: form.status,
@@ -1646,6 +2159,7 @@ const EventManagementForm = ({
       <div className="form-grid">
         <FormInput label="Title" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
         <DatePickerField label="Date" value={form.eventDate} onChange={(eventDate) => setForm({ ...form, eventDate })} required />
+        <DatePickerField label="Registration Deadline" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} required />
         <FormInput label="Venue" value={form.venue} onChange={(venue) => setForm({ ...form, venue })} required />
         <FormInput label="Capacity" type="number" value={form.capacity} onChange={(capacity) => setForm({ ...form, capacity })} required />
       </div>
@@ -1721,6 +2235,7 @@ const CreateEventForm = ({
     title: '',
     description: '',
     eventDate: '',
+    registrationDeadline: '',
     venue: settings.defaultCompetitionVenue,
     capacity: String(settings.defaultEventCapacity),
     requiresApproval: settings.defaultRequiresApproval,
@@ -1732,12 +2247,13 @@ const CreateEventForm = ({
       title: form.title,
       description: form.description,
       eventDate: form.eventDate,
+      registrationDeadline: form.registrationDeadline || form.eventDate,
       venue: form.venue,
       capacity: Number(form.capacity),
       requiresApproval: form.requiresApproval,
       status: 'Draft',
     });
-    setForm({ ...form, title: '', description: '' });
+    setForm({ ...form, title: '', description: '', eventDate: '', registrationDeadline: '' });
     await onCreated('Event saved as draft. Publish it when you are ready for members to register.');
   };
 
@@ -1746,6 +2262,7 @@ const CreateEventForm = ({
       <div className="form-grid">
         <FormInput label="Title" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
         <DatePickerField label="Date" value={form.eventDate} onChange={(eventDate) => setForm({ ...form, eventDate })} required />
+        <DatePickerField label="Registration Deadline" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} required />
         <FormInput label="Venue" value={form.venue} onChange={(venue) => setForm({ ...form, venue })} required />
         <FormInput label="Capacity" type="number" value={form.capacity} onChange={(capacity) => setForm({ ...form, capacity })} required />
       </div>
@@ -1924,10 +2441,38 @@ const CompetitionDetailPanel = ({
   onCategoryCreated: (message: string) => void;
 }) => {
   const [showManage, setShowManage] = React.useState(false);
+  const [tournament, setTournament] = React.useState<TournamentData | null>(null);
+  const [tournamentLoading, setTournamentLoading] = React.useState(false);
+  const [detailTab, setDetailTab] = React.useState<'overview' | 'rules'>('overview');
+  const [tournamentOpen, setTournamentOpen] = React.useState(false);
 
   React.useEffect(() => {
     setShowManage(false);
+    setDetailTab('overview');
+    setTournamentOpen(false);
   }, [competition?.id]);
+
+  const loadTournament = React.useCallback(async () => {
+    if (!competition) {
+      setTournament(null);
+      return;
+    }
+
+    setTournamentLoading(true);
+    try {
+      const response = await apiClient.get<TournamentData>(`/competitions/${competition.id}/tournament`);
+      setTournament(response.data);
+    } finally {
+      setTournamentLoading(false);
+    }
+  }, [competition]);
+
+  React.useEffect(() => {
+    loadTournament().catch((error) => {
+      console.error('Failed to load tournament data:', error);
+      setTournament(null);
+    });
+  }, [loadTournament]);
 
   const publishCompetition = async () => {
     if (!competition) {
@@ -1963,15 +2508,11 @@ const CompetitionDetailPanel = ({
       </div>
       {competition ? (
         <div className="detail-stack">
-          <p>{competition.description}</p>
-          <dl className="detail-grid">
-            <div><dt>Format</dt><dd>{competition.tournament_format || '-'}</dd></div>
-            <div><dt>Scoring</dt><dd>{competition.scoring_system || '-'}</dd></div>
-            <div><dt>Approval</dt><dd>{competition.requires_approval ? 'Required' : 'Automatic'}</dd></div>
-            <div><dt>Signups</dt><dd>{competition.confirmed_signups || 0} confirmed / {competition.pending_signups || 0} pending</dd></div>
-            <div><dt>Attendance</dt><dd>{competition.attended_count || 0} present</dd></div>
-            <div><dt>Registration Deadline</dt><dd>{competition.registration_deadline ? formatDate(competition.registration_deadline) : '-'}</dd></div>
-          </dl>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={detailTab === 'overview' ? 'primary-action compact' : 'secondary-action compact'} onClick={() => setDetailTab('overview')}>Overview</button>
+            <button type="button" className={detailTab === 'rules' ? 'primary-action compact' : 'secondary-action compact'} onClick={() => setDetailTab('rules')}>Rules & Setup</button>
+            <button type="button" className="primary-action compact" onClick={() => setTournamentOpen(true)}>Open Tournament Engine</button>
+          </div>
           {showManage && canCreateEvents && (
             <CompetitionManagementForm
               competition={competition}
@@ -1979,12 +2520,48 @@ const CompetitionDetailPanel = ({
               onChanged={onCompetitionChanged}
             />
           )}
-          <div className="competition-detail-list">
-            <DetailBlock title="Late Policy" text={competition.late_policy} />
-            <DetailBlock title="Arbiter / Disputes" text={competition.arbiter_policy} />
-            <DetailBlock title="Rules" text={competition.rules_text} />
-          </div>
-          {canCreateEvents && <CreateCategoryForm competitionId={competition.id} onCreated={onCategoryCreated} />}
+          {detailTab === 'overview' && (
+            <>
+              <p>{competition.description}</p>
+              <dl className="detail-grid">
+                <div><dt>Format</dt><dd>{competition.tournament_format || '-'}</dd></div>
+                <div><dt>Scoring</dt><dd>{competition.scoring_system || '-'}</dd></div>
+                <div><dt>Approval</dt><dd>{competition.requires_approval ? 'Required' : 'Automatic'}</dd></div>
+                <div><dt>Signups</dt><dd>{competition.confirmed_signups || 0} confirmed / {competition.pending_signups || 0} pending</dd></div>
+                <div><dt>Attendance</dt><dd>{competition.attended_count || 0} present</dd></div>
+                <div><dt>Registration Deadline</dt><dd>{competition.registration_deadline ? formatDate(competition.registration_deadline) : '-'}</dd></div>
+              </dl>
+            </>
+          )}
+          {tournamentOpen && (
+            <TournamentOperationsPanel
+              competitionId={competition.id}
+              competitionTitle={competition.title}
+              tournament={tournament}
+              loading={tournamentLoading}
+              canManage={canCreateEvents}
+              onClose={() => setTournamentOpen(false)}
+              onChanged={async (nextMessage) => {
+                await loadTournament();
+                onCompetitionChanged(nextMessage);
+              }}
+            />
+          )}
+          {detailTab === 'rules' && (
+            <>
+              <div className="competition-detail-list">
+                <DetailBlock title="Late Policy" text={competition.late_policy} />
+                <DetailBlock title="Arbiter / Disputes" text={competition.arbiter_policy} />
+                <DetailBlock title="Rules" text={competition.rules_text} />
+              </div>
+              {canCreateEvents && (
+                <>
+                  <CategoryCapacityEditor categories={competition.categories} onChanged={onCategoryCreated} />
+                  <CreateCategoryForm competitionId={competition.id} onCreated={onCategoryCreated} />
+                </>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <p className="empty-state">Select a competition to view its settings.</p>
@@ -2108,6 +2685,277 @@ const DetailBlock = ({ title, text }: { title: string; text: string | null }) =>
   </article>
 );
 
+const CategoryCapacityEditor = ({
+  categories,
+  onChanged,
+}: {
+  categories: Category[];
+  onChanged: (message: string) => void;
+}) => {
+  const [forms, setForms] = React.useState<Record<number, { name: string; capacity: string; registrationFee: string }>>({});
+
+  React.useEffect(() => {
+    setForms(Object.fromEntries(categories.map((category) => [
+      category.id,
+      {
+        name: category.name,
+        capacity: String(category.capacity),
+        registrationFee: String(Number(category.registration_fee || 0)),
+      },
+    ])));
+  }, [categories]);
+
+  const updateForm = (categoryId: number, nextValues: Partial<{ name: string; capacity: string; registrationFee: string }>) => {
+    setForms((current) => ({
+      ...current,
+      [categoryId]: {
+        ...current[categoryId],
+        ...nextValues,
+      },
+    }));
+  };
+
+  const saveCategory = async (categoryId: number) => {
+    const form = forms[categoryId];
+    if (!form) {
+      return;
+    }
+
+    const response = await apiClient.put<{ message: string }>(`/competitions/categories/${categoryId}`, {
+      name: form.name,
+      capacity: Number(form.capacity),
+      registrationFee: Number(form.registrationFee || 0),
+    });
+    onChanged(response.data.message || 'Category updated.');
+  };
+
+  if (categories.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="inline-form">
+      <h3>Category Capacity</h3>
+      <p className="panel-intro">Competition size is calculated from category capacities. Capacity cannot be lower than active signups.</p>
+      <div className="grid gap-3">
+        {categories.map((category) => {
+          const form = forms[category.id] || {
+            name: category.name,
+            capacity: String(category.capacity),
+            registrationFee: String(Number(category.registration_fee || 0)),
+          };
+
+          return (
+            <article key={category.id} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+              <div className="form-grid">
+                <FormInput label="Category" value={form.name} onChange={(name) => updateForm(category.id, { name })} required />
+                <FormInput label="Capacity" type="number" value={form.capacity} onChange={(capacity) => updateForm(category.id, { capacity })} required />
+                <FormInput label="Fee" type="number" value={form.registrationFee} onChange={(registrationFee) => updateForm(category.id, { registrationFee })} />
+              </div>
+              <button type="button" className="primary-action compact" onClick={() => saveCategory(category.id)}>
+                Save Category
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+const TournamentOperationsPanel = ({
+  competitionId,
+  competitionTitle,
+  tournament,
+  loading,
+  canManage,
+  onClose,
+  onChanged,
+}: {
+  competitionId: number;
+  competitionTitle: string;
+  tournament: TournamentData | null;
+  loading: boolean;
+  canManage: boolean;
+  onClose: () => void;
+  onChanged: (message: string) => void | Promise<void>;
+}) => {
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<number | null>(null);
+  const [workspaceTab, setWorkspaceTab] = React.useState<'pairings' | 'standings' | 'insights'>('pairings');
+  const categories = tournament?.categories || [];
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || categories[0] || null;
+  const roundKeys = selectedCategory
+    ? Array.from(new Set(selectedCategory.standings.flatMap((standing) => Object.keys(standing.rounds)))).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))
+    : [];
+  const latestRoundNumber = selectedCategory?.matches.reduce((maxRound, match) => Math.max(maxRound, Number(match.round_number || 0)), 0) || 0;
+  const latestRoundMatches = selectedCategory
+    ? selectedCategory.matches
+      .filter((match) => Number(match.round_number) === latestRoundNumber)
+      .sort((a, b) => a.table_number - b.table_number)
+    : [];
+
+  React.useEffect(() => {
+    if (!selectedCategoryId && categories[0]) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, selectedCategoryId]);
+
+  const generateRound = async () => {
+    if (!selectedCategory) {
+      return;
+    }
+
+    const response = await apiClient.post<{ message: string }>(`/competitions/${competitionId}/categories/${selectedCategory.id}/rounds/generate`);
+    await onChanged(response.data.message);
+  };
+
+  const updateResult = async (matchId: number, result: string) => {
+    const response = await apiClient.put<{ message: string }>(`/competitions/matches/${matchId}/result`, { result });
+    await onChanged(response.data.message);
+  };
+
+  return (
+    <div className="edit-modal-backdrop tournament-workspace-backdrop" role="presentation">
+      <section className="tournament-workspace" role="dialog" aria-modal="true" aria-label={`${competitionTitle} tournament engine`}>
+        <div className="tournament-workspace-head">
+          <div>
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Tournament engine</p>
+            <h3 className="m-0 text-2xl font-black text-white">{competitionTitle}</h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="min-w-[190px] rounded-md border border-app-border bg-[#111] px-3 py-2 font-bold text-white"
+              value={selectedCategory?.id || ''}
+              onChange={(event) => setSelectedCategoryId(Number(event.target.value))}
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+            <button type="button" className="secondary-action compact" onClick={onClose}>Close</button>
+          </div>
+        </div>
+
+        <div className="tournament-tabs">
+          <button type="button" className={workspaceTab === 'pairings' ? 'active' : ''} onClick={() => setWorkspaceTab('pairings')}>Pairings</button>
+          <button type="button" className={workspaceTab === 'standings' ? 'active' : ''} onClick={() => setWorkspaceTab('standings')}>Standings</button>
+          <button type="button" className={workspaceTab === 'insights' ? 'active' : ''} onClick={() => setWorkspaceTab('insights')}>Insights</button>
+        </div>
+
+      {loading && <p className="empty-state">Loading tournament data...</p>}
+      {!loading && !selectedCategory && <p className="empty-state">Add a category and approve players before generating pairings.</p>}
+
+      {selectedCategory && (
+        <div className="grid gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <Insight label="Players" value={String(selectedCategory.player_count)} detail="approved registrations" />
+            <Insight label="Rounds" value={String(selectedCategory.rounds.length)} detail="generated so far" />
+            <Insight label="Completion" value={`${selectedCategory.insights.completion_rate}%`} detail={`${selectedCategory.insights.completed_matches}/${selectedCategory.insights.scheduled_matches} matches`} />
+            <Insight label="Tied Leaders" value={String(selectedCategory.insights.tied_leaders)} detail="same top MMS" />
+          </div>
+
+          {workspaceTab === 'pairings' && (
+            <section className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+              <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <ChartHeader
+                  title={latestRoundNumber > 0 ? `Round ${latestRoundNumber} Pairings` : 'Current Pairings'}
+                  subtitle="Only the latest round is shown here. Standings remain cumulative across all rounds."
+                />
+                {canManage && (
+                  <button type="button" className="primary-action compact" disabled={!selectedCategory} onClick={generateRound}>
+                    Generate Next Round
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-3">
+                {latestRoundMatches.map((match) => (
+                  <article key={match.id} className="grid gap-3 rounded-lg border border-app-border bg-[#181818] p-3 md:grid-cols-[150px_minmax(0,1fr)_220px] md:items-center">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <strong className="text-white">R{match.round_number} - Table {match.table_number}</strong>
+                      <span className="status-pill">{match.result}</span>
+                    </div>
+                    <div className="grid gap-2 text-sm text-app-muted md:grid-cols-2">
+                      <span><strong className="text-white">Black:</strong> {match.black_name || 'Bye'}</span>
+                      <span><strong className="text-white">White:</strong> {match.white_name || 'Bye'}</span>
+                    </div>
+                    {canManage && match.white_user_id && (
+                      <label className="form-field mt-3">
+                        <span>Result</span>
+                        <select value={match.result} onChange={(event) => updateResult(match.id, event.target.value)}>
+                          <option value="Scheduled">Scheduled</option>
+                          <option value="Black Win">Black Win</option>
+                          <option value="White Win">White Win</option>
+                          <option value="Forfeit Black">Black Forfeit</option>
+                          <option value="Forfeit White">White Forfeit</option>
+                        </select>
+                      </label>
+                    )}
+                  </article>
+                ))}
+                {latestRoundMatches.length === 0 && <p className="empty-state">No pairings yet. Generate the first round after registrations are approved.</p>}
+              </div>
+            </section>
+          )}
+
+          {workspaceTab === 'standings' && (
+            <section className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+              <ChartHeader title="OpenGotha-style Standings" subtitle="Sorted by MMS, then SOS, SOSOS, wins and player number." />
+              <div className="overflow-x-auto">
+                <table className="data-table min-w-[760px]">
+                  <thead>
+                    <tr>
+                      <th>Num</th>
+                      <th>Pl</th>
+                      <th>Name</th>
+                      <th>Rk</th>
+                      <th>Co</th>
+                      <th>NbW</th>
+                      {roundKeys.map((roundKey) => <th key={roundKey}>{roundKey}</th>)}
+                      <th>MMS</th>
+                      <th>SOS</th>
+                      <th>SOSOS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCategory.standings.map((standing) => (
+                      <tr key={standing.user_id}>
+                        <td>{standing.rank_position}</td>
+                        <td>{standing.player_number}</td>
+                        <td>{standing.name}</td>
+                        <td>{formatRank(standing.rank_type, standing.rank_value)}</td>
+                        <td>{standing.school || '-'}</td>
+                        <td>{standing.wins}</td>
+                        {roundKeys.map((roundKey) => <td key={roundKey}>{standing.rounds[roundKey] || '-'}</td>)}
+                        <td>{standing.mms}</td>
+                        <td>{standing.sos}</td>
+                        <td>{standing.sosos}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selectedCategory.standings.length === 0 && <p className="empty-state">No approved players in this category yet.</p>}
+            </section>
+          )}
+
+          {workspaceTab === 'insights' && (
+            <section className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
+              <ChartHeader title="Tournament Insights" subtitle="Operational signals from this category's pairings and standings." />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <SignalCard label="Open Results" value={selectedCategory.insights.no_result_matches} detail="matches still scheduled" tone={selectedCategory.insights.no_result_matches > 0 ? 'warn' : 'good'} />
+                <SignalCard label="Completed" value={selectedCategory.insights.completed_matches} detail="matches with recorded result" tone="good" />
+                <SignalCard label="Current Round" value={latestRoundNumber || '-'} detail="latest generated round" tone="good" />
+                <SignalCard label="Tie Pressure" value={selectedCategory.insights.tied_leaders} detail="leaders on same MMS" tone={selectedCategory.insights.tied_leaders > 1 ? 'warn' : 'good'} />
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+      </section>
+    </div>
+  );
+};
+
 const CreateCategoryForm = ({
   competitionId,
   onCreated,
@@ -2169,20 +3017,27 @@ const CategoriesPanel = ({
         </div>
       </div>
       <div className="category-list">
-        {categories.map((category) => (
-          <article className="category-item" key={category.id}>
-            <div>
-              <strong>{category.name}</strong>
-              <small>
-                Capacity {category.capacity} - Fee ${Number(category.registration_fee).toFixed(2)}
-                {category.current_user_registration_status ? ` - ${category.current_user_registration_status}` : ''}
-              </small>
-            </div>
-            <button type="button" className="secondary-action compact" disabled={Boolean(existingCompetitionRegistration)} onClick={() => registerForCategory(category)}>
-              {category.current_user_registration_status || (existingCompetitionRegistration ? 'Already Registered' : 'Register')}
-            </button>
-          </article>
-        ))}
+        {categories.map((category) => {
+          const registerLabel = category.registration_closed && category.current_user_registration_status !== 'Registered'
+            ? 'Registration Closed'
+            : category.current_user_registration_status || (existingCompetitionRegistration ? 'Already Registered' : 'Register');
+
+          return (
+            <article className="category-item" key={category.id}>
+              <div>
+                <strong>{category.name}</strong>
+                <small>
+                  Capacity {category.capacity} - Fee ${Number(category.registration_fee).toFixed(2)}
+                  {category.registration_closed ? ' - Registration closed' : ''}
+                  {category.current_user_registration_status && !category.registration_closed ? ` - ${category.current_user_registration_status}` : ''}
+                </small>
+              </div>
+              <button type="button" className="secondary-action compact" disabled={Boolean(existingCompetitionRegistration) || category.registration_closed} onClick={() => registerForCategory(category)}>
+                {registerLabel}
+              </button>
+            </article>
+          );
+        })}
         {categories.length === 0 && <p className="empty-state">No categories added yet.</p>}
       </div>
     </div>
@@ -2230,11 +3085,13 @@ const AttendancePanel = ({
   registrations,
   eventRegistrations,
   canApprove,
+  currentRole,
   onStatusChanged,
 }: {
   registrations: Registration[];
   eventRegistrations: EventRegistration[];
   canApprove: boolean;
+  currentRole: string;
   onStatusChanged: (message: string) => void;
 }) => {
   const [activityFilter, setActivityFilter] = React.useState('All');
@@ -2246,10 +3103,23 @@ const AttendancePanel = ({
   const pendingEventRegistrations = eventRegistrations.filter((registration) => registration.status === 'Pending Approval');
   const approvedCompetitionRegistrations = registrations.filter((registration) => registration.status === 'Registered');
   const approvedEventRegistrations = eventRegistrations.filter((registration) => registration.status === 'Registered');
-  const activityOptions = Array.from(new Set([
-    ...approvedCompetitionRegistrations.map((registration) => `Competition: ${registration.competition_title}`),
-    ...approvedEventRegistrations.map((registration) => `Event: ${registration.event_title}`),
-  ])).sort();
+  const activityOptionDates = new Map<string, string>();
+  const addActivityOption = (label: string, activityDate: string) => {
+    const currentDate = activityOptionDates.get(label);
+    if (!currentDate || compareActivityDates(activityDate, currentDate) < 0) {
+      activityOptionDates.set(label, activityDate);
+    }
+  };
+  approvedCompetitionRegistrations.forEach((registration) => {
+    addActivityOption(`Competition: ${registration.competition_title}`, registration.competition_start_date);
+  });
+  approvedEventRegistrations.forEach((registration) => {
+    addActivityOption(`Event: ${registration.event_title}`, registration.event_date);
+  });
+  const activityOptions = Array.from(activityOptionDates.keys()).sort((left, right) => (
+    compareActivityDates(activityOptionDates.get(left), activityOptionDates.get(right))
+    || left.localeCompare(right)
+  ));
   const queueOptions = Array.from(new Set([
     ...pendingCompetitionRegistrations.map((registration) => `Competition: ${registration.competition_title}`),
     ...pendingEventRegistrations.map((registration) => `Event: ${registration.event_title}`),
@@ -2299,6 +3169,7 @@ const AttendancePanel = ({
       id: registration.id,
       name: registration.participant_name,
       detail: `${registration.competition_title} - ${registration.category_name}`,
+      activityDate: registration.competition_start_date,
       attended: registration.attended,
     })),
     ...filteredEventAttendance.map((registration) => ({
@@ -2307,9 +3178,14 @@ const AttendancePanel = ({
       id: registration.id,
       name: registration.member_name,
       detail: registration.event_title,
+      activityDate: registration.event_date,
       attended: registration.attended,
     })),
-  ];
+  ].sort((left, right) => (
+    compareActivityDates(left.activityDate, right.activityDate)
+    || left.detail.localeCompare(right.detail)
+    || left.name.localeCompare(right.name)
+  ));
   const queueSlice = paginate(queueRows, queuePage, 8);
   const attendanceSlice = paginate(attendanceRows, attendancePage, 10);
 
@@ -2451,10 +3327,14 @@ const AttendancePanel = ({
                   <td>{registration.name}</td>
                   <td>{registration.detail}</td>
                   <td>
-                    <label className="check-row table-check">
+                    {(() => {
+                      const attendanceState = getAttendanceMarkingState(registration.activityDate, currentRole);
+                      return (
+                    <label className="check-row table-check" title={attendanceState.help}>
                       <input
                         type="checkbox"
                         checked={registration.attended}
+                        disabled={!attendanceState.canMark}
                         onChange={(event) => {
                           if (registration.type === 'Competition') {
                             updateCompetitionAttendance(registration.id, event.target.checked);
@@ -2463,8 +3343,10 @@ const AttendancePanel = ({
                           }
                         }}
                       />
-                      Present
+                      {attendanceState.label}
                     </label>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}
@@ -2485,12 +3367,14 @@ const MemberParticipationPanel = ({
   eventRegistrations,
   canApprove,
   canDelete,
+  currentRole,
   onChanged,
 }: {
   registrations: Registration[];
   eventRegistrations: EventRegistration[];
   canApprove: boolean;
   canDelete: boolean;
+  currentRole: string;
   onChanged: (message: string) => void;
 }) => {
   const navigate = useNavigate();
@@ -2515,6 +3399,7 @@ const MemberParticipationPanel = ({
         type: 'Competition' | 'Event';
         title: string;
         detail: string;
+        activityDate: string;
         status: string;
         attended: boolean;
         profile: {
@@ -2558,6 +3443,7 @@ const MemberParticipationPanel = ({
         type: 'Competition',
         title: registration.competition_title,
         detail: registration.category_name,
+        activityDate: registration.competition_start_date,
         status: registration.status,
         attended: registration.attended,
         profile: {
@@ -2581,6 +3467,7 @@ const MemberParticipationPanel = ({
         type: 'Event',
         title: registration.event_title,
         detail: registration.requires_approval ? 'Approval required' : 'Auto approval',
+        activityDate: registration.event_date,
         status: registration.status,
         attended: registration.attended,
         profile: {
@@ -2597,9 +3484,11 @@ const MemberParticipationPanel = ({
   }, [registrations, eventRegistrations]);
 
   const activityOptions = React.useMemo(() => {
-    const activities = memberRows.flatMap((member) => member.items.map((item) => `${item.type}: ${item.title}`));
+    const activities = memberRows.flatMap((member) => member.items
+      .filter((item) => typeFilter === 'All' || item.type === typeFilter)
+      .map((item) => `${item.type}: ${item.title}`));
     return Array.from(new Set(activities)).sort();
-  }, [memberRows]);
+  }, [memberRows, typeFilter]);
 
   const getVisibleItems = React.useCallback((member: typeof memberRows[number]) => member.items.filter((item) => {
     const matchesType = typeFilter === 'All' || item.type === typeFilter;
@@ -2690,6 +3579,12 @@ const MemberParticipationPanel = ({
     setMemberPage(1);
   }, [activityFilter, search, statusFilter, typeFilter]);
 
+  React.useEffect(() => {
+    if (activityFilter !== 'All' && !activityOptions.includes(activityFilter)) {
+      setActivityFilter('All');
+    }
+  }, [activityFilter, activityOptions]);
+
   return (
     <section className="panel large-panel member-management-panel">
       <div className="panel-heading">
@@ -2725,7 +3620,7 @@ const MemberParticipationPanel = ({
         <label className="form-field">
           <span>Activity</span>
           <select value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}>
-            <option value="All">All events and competitions</option>
+            <option value="All">{typeFilter === 'All' ? 'All events and competitions' : `All ${typeFilter.toLowerCase()}s`}</option>
             {activityOptions.map((activity) => (
               <option key={activity} value={activity}>{activity}</option>
             ))}
@@ -2787,10 +3682,14 @@ const MemberParticipationPanel = ({
                       </span>
                     )}
                     {item.status === 'Registered' && (
-                      <label className="check-row table-check">
+                      (() => {
+                        const attendanceState = getAttendanceMarkingState(item.activityDate, currentRole);
+                        return (
+                      <label className="check-row table-check" title={attendanceState.help}>
                         <input
                           type="checkbox"
                           checked={item.attended}
+                          disabled={!attendanceState.canMark}
                           onChange={(event) => {
                             if (item.type === 'Competition') {
                               updateCompetitionAttendance(item.id, event.target.checked);
@@ -2799,8 +3698,10 @@ const MemberParticipationPanel = ({
                             }
                           }}
                         />
-                        Present
+                        {attendanceState.label}
                       </label>
+                        );
+                      })()
                     )}
                     {canDelete && (
                       <button type="button" className="danger-action compact" onClick={() => setRemoveTarget(item)}>
@@ -3364,6 +4265,17 @@ const formatShortDate = (dateValue: string) => {
   }).format(new Date(dateValue));
 };
 
+const formatMonth = (dateValue: string) => {
+  if (!dateValue) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat('en-SG', {
+    month: 'short',
+    year: '2-digit',
+  }).format(new Date(dateValue));
+};
+
 const formatDateTime = (dateValue: string) => {
   if (!dateValue) {
     return '-';
@@ -3377,12 +4289,91 @@ const formatDateTime = (dateValue: string) => {
   }).format(new Date(dateValue));
 };
 
+const compareActivityDates = (leftDate?: string | null, rightDate?: string | null) => {
+  const today = startOfDay(new Date()).getTime();
+  const getSortValue = (dateValue?: string | null) => {
+    if (!dateValue) {
+      return { bucket: 3, distance: Number.MAX_SAFE_INTEGER };
+    }
+
+    const activityTime = startOfDay(new Date(dateValue)).getTime();
+    if (activityTime === today) {
+      return { bucket: 0, distance: 0 };
+    }
+
+    if (activityTime > today) {
+      return { bucket: 1, distance: activityTime - today };
+    }
+
+    return { bucket: 2, distance: today - activityTime };
+  };
+
+  const left = getSortValue(leftDate);
+  const right = getSortValue(rightDate);
+  return left.bucket - right.bucket || left.distance - right.distance;
+};
+
 const toDateInput = (dateValue: string) => {
   if (!dateValue) {
     return '';
   }
 
   return new Date(dateValue).toISOString().slice(0, 10);
+};
+
+const isPastDate = (dateValue?: string | null) => {
+  if (!dateValue) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(dateValue);
+  date.setHours(0, 0, 0, 0);
+  return date < today;
+};
+
+const getAttendanceMarkingState = (dateValue: string | null | undefined, role: string) => {
+  if (!dateValue) {
+    return {
+      canMark: false,
+      label: 'Date pending',
+      help: 'Attendance cannot be marked until the activity date is confirmed.',
+    };
+  }
+
+  const today = startOfDay(new Date());
+  const activityDate = startOfDay(new Date(dateValue));
+
+  if (activityDate > today) {
+    return {
+      canMark: false,
+      label: `Opens ${formatShortDate(dateValue)}`,
+      help: `Attendance opens on ${formatDate(dateValue)}.`,
+    };
+  }
+
+  if (activityDate.getTime() === today.getTime()) {
+    return {
+      canMark: true,
+      label: 'Present',
+      help: 'Attendance can be marked today.',
+    };
+  }
+
+  if (role === 'Captain') {
+    return {
+      canMark: true,
+      label: 'Present',
+      help: 'Past attendance can only be changed by the Captain.',
+    };
+  }
+
+  return {
+    canMark: false,
+    label: 'Captain approval',
+    help: 'This activity has ended. Ask the Captain to update attendance.',
+  };
 };
 
 const startOfDay = (date: Date) => {

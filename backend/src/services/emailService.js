@@ -65,6 +65,13 @@ module.exports.sendActivityChangeEmail = async ({ to, name, activityType, activi
   const transporter = createTransporter();
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   const subject = `${activityType} ${action}: ${activityTitle}`;
+  const isRegistrationRejection = action === "Registration Rejected";
+  const activitySentence = isRegistrationRejection
+    ? `Your registration request for the ${activityType.toLowerCase()} "${activityTitle}" has been rejected.`
+    : `The ${activityType.toLowerCase()} "${activityTitle}" has been ${action.toLowerCase()}.`;
+  const activityHtml = isRegistrationRejection
+    ? `Your registration request for the ${activityType.toLowerCase()} <strong>${activityTitle}</strong> has been rejected.`
+    : `The ${activityType.toLowerCase()} <strong>${activityTitle}</strong> has been ${action.toLowerCase()}.`;
 
   await transporter.sendMail({
     from,
@@ -73,7 +80,7 @@ module.exports.sendActivityChangeEmail = async ({ to, name, activityType, activi
     text: [
       `Hi ${name || "there"},`,
       "",
-      `The ${activityType.toLowerCase()} "${activityTitle}" has been ${action.toLowerCase()}.`,
+      activitySentence,
       "",
       "Reason:",
       reason,
@@ -82,7 +89,7 @@ module.exports.sendActivityChangeEmail = async ({ to, name, activityType, activi
     ].join("\n"),
     html: `
       <p>Hi ${name || "there"},</p>
-      <p>The ${activityType.toLowerCase()} <strong>${activityTitle}</strong> has been ${action.toLowerCase()}.</p>
+      <p>${activityHtml}</p>
       <p><strong>Reason:</strong></p>
       <p>${reason}</p>
       <p>Please check TourneysHub for the latest details.</p>

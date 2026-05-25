@@ -1463,6 +1463,57 @@ th {
   margin: 0;
 }
 
+.tournament-workspace-backdrop {
+  align-items: center;
+}
+
+.tournament-workspace {
+  width: min(1240px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  border: 1px solid #2c2c2e;
+  border-radius: 22px;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 82% 0%, rgba(0, 229, 255, 0.16), transparent 28%),
+    #1e1e1e;
+  box-shadow: 0 32px 110px rgba(0, 0, 0, 0.62);
+}
+
+.tournament-workspace-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.tournament-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border: 1px solid #2c2c2e;
+  border-radius: 14px;
+  background: rgba(18, 18, 18, 0.78);
+}
+
+.tournament-tabs button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  color: #98989d;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tournament-tabs button.active {
+  background: #00e5ff;
+  color: #121212;
+}
+
 .confirm-dialog {
   width: min(460px, 100%);
   border: 1px solid #2c2c2e;

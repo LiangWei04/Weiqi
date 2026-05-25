@@ -1,6 +1,16 @@
 const model = require("../models/eventModel");
 const emailService = require("../services/emailService");
 const notificationModel = require("../models/notificationModel");
+const autoRejectService = require("../services/autoRejectService");
+
+const runAutoRejections = async () => {
+  try {
+    return await autoRejectService.rejectClosedOrFullPendingRequests();
+  } catch (error) {
+    console.error("Error auto rejecting pending requests:", error);
+    return null;
+  }
+};
 
 const notifyParticipants = async ({ recipients, activityType, activityTitle, action, reason }) => {
   const userIds = recipients.map((recipient) => recipient.user_id).filter(Boolean);
@@ -41,12 +51,25 @@ const notifyParticipants = async ({ recipients, activityType, activityTitle, act
 };
 
 const isBeforeToday = (dateValue) => {
+  if (!dateValue) {
+    return false;
+  }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return new Date(dateValue) < today;
 };
 
-module.exports.readAll = (req, res) => {
+const isAfterDate = (dateValue, compareDateValue) => {
+  if (!dateValue || !compareDateValue) {
+    return false;
+  }
+
+  return new Date(dateValue) > new Date(compareDateValue);
+};
+
+module.exports.readAll = async (req, res) => {
+  await runAutoRejections();
+
   model.selectAll({ user_id: res.locals.userId }, (error, results) => {
     if (error) {
       console.error("Error readAll events:", error);
@@ -69,10 +92,15 @@ module.exports.createEvent = (req, res) => {
     return res.status(400).json({ message: "Event date cannot be in the past" });
   }
 
+  if (req.body.registrationDeadline && isAfterDate(req.body.registrationDeadline, req.body.eventDate)) {
+    return res.status(400).json({ message: "Registration deadline cannot be after the event date" });
+  }
+
   const data = {
     title: req.body.title,
     description: req.body.description || "",
     eventDate: req.body.eventDate,
+    registrationDeadline: req.body.registrationDeadline || req.body.eventDate,
     venue: req.body.venue,
     capacity: req.body.capacity,
     status: "Draft",
@@ -100,11 +128,16 @@ module.exports.updateEventById = (req, res) => {
     return res.status(400).json({ message: "Event date cannot be in the past" });
   }
 
+  if (req.body.registrationDeadline && req.body.eventDate && isAfterDate(req.body.registrationDeadline, req.body.eventDate)) {
+    return res.status(400).json({ message: "Registration deadline cannot be after the event date" });
+  }
+
   const data = {
     event_id: req.params.event_id,
     title: req.body.title,
     description: req.body.description,
     eventDate: req.body.eventDate,
+    registrationDeadline: req.body.registrationDeadline,
     venue: req.body.venue,
     capacity: req.body.capacity,
     status: req.body.status,
@@ -217,6 +250,10 @@ module.exports.registerForEvent = (req, res) => {
 
     if (event.status !== "Open") {
       return res.status(400).json({ message: "Event is not open for registration" });
+    }
+
+    if (event.registration_deadline && isBeforeToday(event.registration_deadline)) {
+      return res.status(400).json({ message: "Registration deadline has closed for this event" });
     }
 
     if (["Registered", "Pending Approval"].includes(event.current_user_registration_status)) {

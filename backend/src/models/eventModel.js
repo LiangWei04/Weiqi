@@ -2,7 +2,7 @@ const pool = require("../services/db");
 
 module.exports.selectAll = (data, callback) => {
   const SQLSTATEMENT = `
-    SELECT e.id, e.title, e.description, e.event_date, e.venue, e.capacity, e.status, e.requires_approval, e.created_at,
+    SELECT e.id, e.title, e.description, e.event_date, e.registration_deadline, e.venue, e.capacity, e.status, e.requires_approval, e.created_at,
       COUNT(r.id) FILTER (WHERE r.status = 'Registered')::int AS registered,
       COUNT(r.id) FILTER (WHERE r.status = 'Pending Approval')::int AS pending_requests,
       COUNT(r.id) FILTER (WHERE r.status IN ('Registered', 'Pending Approval'))::int AS active_signups,
@@ -18,11 +18,11 @@ module.exports.selectAll = (data, callback) => {
 
 module.exports.insertSingle = (data, callback) => {
   const SQLSTATEMENT = `
-    INSERT INTO events (title, description, event_date, venue, capacity, status, requires_approval, created_by)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO events (title, description, event_date, registration_deadline, venue, capacity, status, requires_approval, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *;
   `;
-  const VALUES = [data.title, data.description, data.eventDate, data.venue, data.capacity, data.status, data.requiresApproval, data.createdBy];
+  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue, data.capacity, data.status, data.requiresApproval, data.createdBy];
   pool.query(SQLSTATEMENT, VALUES, callback);
 };
 
@@ -36,14 +36,15 @@ module.exports.updateById = (data, callback) => {
     SET title = COALESCE($1, title),
         description = COALESCE($2, description),
         event_date = COALESCE($3, event_date),
-        venue = COALESCE($4, venue),
-        capacity = COALESCE($5, capacity),
-        status = COALESCE($6, status),
-        requires_approval = COALESCE($7, requires_approval)
-    WHERE id = $8
+        registration_deadline = COALESCE($4, registration_deadline),
+        venue = COALESCE($5, venue),
+        capacity = COALESCE($6, capacity),
+        status = COALESCE($7, status),
+        requires_approval = COALESCE($8, requires_approval)
+    WHERE id = $9
     RETURNING *;
   `;
-  const VALUES = [data.title, data.description, data.eventDate, data.venue, data.capacity, data.status, data.requiresApproval, data.event_id];
+  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue, data.capacity, data.status, data.requiresApproval, data.event_id];
   pool.query(SQLSTATEMENT, VALUES, callback);
 };
 
@@ -71,7 +72,7 @@ module.exports.deleteById = (data, callback) => {
 
 module.exports.selectRegistrationAvailability = (data, callback) => {
   const SQLSTATEMENT = `
-    SELECT e.id, e.capacity, e.status, e.requires_approval,
+    SELECT e.id, e.capacity, e.status, e.requires_approval, e.registration_deadline,
       COUNT(r.id) FILTER (WHERE r.status IN ('Registered', 'Pending Approval'))::int AS active_signups,
       MAX(r.status) FILTER (WHERE r.user_id = $2) AS current_user_registration_status
     FROM events e

@@ -83,6 +83,7 @@ module.exports = async function initTables() {
       title VARCHAR(160) NOT NULL,
       description TEXT,
       event_date DATE NOT NULL,
+      registration_deadline DATE,
       venue VARCHAR(160) NOT NULL,
       capacity INTEGER NOT NULL CHECK (capacity > 0),
       status VARCHAR(30) NOT NULL DEFAULT 'Draft',
@@ -100,6 +101,17 @@ module.exports = async function initTables() {
   await db.query(`
     ALTER TABLE events
       ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
+  await db.query(`
+    ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS registration_deadline DATE;
+  `);
+
+  await db.query(`
+    UPDATE events
+    SET registration_deadline = event_date
+    WHERE registration_deadline IS NULL;
   `);
 
   await db.query(`
@@ -284,6 +296,62 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
+    ALTER TABLE competition_registrations
+      ADD COLUMN IF NOT EXISTS initial_mms NUMERIC(5, 2) NOT NULL DEFAULT 10;
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS competition_rounds (
+      id SERIAL PRIMARY KEY,
+      competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES competition_categories(id) ON DELETE CASCADE,
+      round_number INTEGER NOT NULL CHECK (round_number > 0),
+      status VARCHAR(30) NOT NULL DEFAULT 'Pairing Generated'
+        CHECK (status IN ('Pairing Generated', 'In Progress', 'Completed')),
+      generated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (category_id, round_number)
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS competition_matches (
+      id SERIAL PRIMARY KEY,
+      competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES competition_categories(id) ON DELETE CASCADE,
+      round_id INTEGER NOT NULL REFERENCES competition_rounds(id) ON DELETE CASCADE,
+      table_number INTEGER NOT NULL,
+      black_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      white_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      handicap INTEGER NOT NULL DEFAULT 0 CHECK (handicap >= 0),
+      result VARCHAR(30) NOT NULL DEFAULT 'Scheduled'
+        CHECK (result IN ('Scheduled', 'Black Win', 'White Win', 'Draw', 'Bye', 'Forfeit Black', 'Forfeit White')),
+      winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS competition_ranking_records (
+      id SERIAL PRIMARY KEY,
+      competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES competition_categories(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      round_number INTEGER NOT NULL,
+      rank_position INTEGER NOT NULL,
+      mms NUMERIC(6, 2) NOT NULL DEFAULT 0,
+      sos NUMERIC(6, 2) NOT NULL DEFAULT 0,
+      sosos NUMERIC(6, 2) NOT NULL DEFAULT 0,
+      wins INTEGER NOT NULL DEFAULT 0,
+      losses INTEGER NOT NULL DEFAULT 0,
+      draws INTEGER NOT NULL DEFAULT 0,
+      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (competition_id, category_id, user_id, round_number)
+    );
+  `);
+
+  await db.query(`
     DROP TABLE IF EXISTS registration_form_answers;
     DROP TABLE IF EXISTS registration_form_fields;
   `);
@@ -458,12 +526,12 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
-    INSERT INTO events (title, description, event_date, venue, capacity, status)
+    INSERT INTO events (title, description, event_date, registration_deadline, venue, capacity, status)
     SELECT * FROM (VALUES
-      ('Weekly Weiqi Training', 'Regular practice session for all skill levels.', '2026-05-15'::date, 'CCA Room 2', 24, 'Open'),
-      ('Beginner Strategy Clinic', 'Small-group clinic for new members.', '2026-05-18'::date, 'Library Hub', 16, 'Open'),
-      ('Friendly Match Day', 'Casual internal games and review.', '2026-05-23'::date, 'Hall B', 32, 'Open')
-    ) AS seed(title, description, event_date, venue, capacity, status)
+      ('Weekly Weiqi Training', 'Regular practice session for all skill levels.', '2026-05-15'::date, '2026-05-13'::date, 'CCA Room 2', 24, 'Open'),
+      ('Beginner Strategy Clinic', 'Small-group clinic for new members.', '2026-05-18'::date, '2026-05-16'::date, 'Library Hub', 16, 'Open'),
+      ('Friendly Match Day', 'Casual internal games and review.', '2026-05-23'::date, '2026-05-21'::date, 'Hall B', 32, 'Open')
+    ) AS seed(title, description, event_date, registration_deadline, venue, capacity, status)
     WHERE NOT EXISTS (SELECT 1 FROM events);
   `);
 };

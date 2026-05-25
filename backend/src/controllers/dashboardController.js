@@ -34,3 +34,25 @@ module.exports.readStats = (req, res) => {
     });
   });
 };
+
+module.exports.readMemberStats = (req, res) => {
+  const data = {
+    user_id: res.locals.userId,
+  };
+
+  model.selectMemberStats(data, (error, results) => {
+    if (error) {
+      console.error("Error readMemberStats:", error);
+      return res.status(500).json(error);
+    }
+
+    const stats = results.rows[0];
+    return res.status(200).json({
+      ...stats,
+      status_breakdown: stats.status_breakdown || [],
+      type_breakdown: stats.type_breakdown || [],
+      monthly_activity: stats.monthly_activity || [],
+      upcoming_activities: stats.upcoming_activities || [],
+    });
+  });
+};

@@ -12,6 +12,7 @@ module.exports.selectAll = (callback) => {
       p.rank_type,
       p.rank_value,
       e.title AS event_title,
+      e.event_date,
       e.requires_approval
     FROM event_registrations r
     JOIN users u ON u.id = r.user_id
@@ -24,22 +25,43 @@ module.exports.selectAll = (callback) => {
 
 module.exports.updateAttendance = (data, callback) => {
   const SQLSTATEMENT = `
-    UPDATE event_registrations
+    UPDATE event_registrations r
     SET attended = $1
-    WHERE id = $2
-      AND status = 'Registered'
-    RETURNING *;
+    FROM events e
+    WHERE r.id = $2
+      AND r.event_id = e.id
+      AND r.status = 'Registered'
+      AND (
+        (e.event_date AT TIME ZONE 'Asia/Singapore')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
+        OR (
+          $3::varchar = 'Captain'
+          AND (e.event_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
+        )
+      )
+    RETURNING r.*, e.event_date;
   `;
-  pool.query(SQLSTATEMENT, [data.attended, data.registration_id], callback);
+  pool.query(SQLSTATEMENT, [data.attended, data.registration_id, data.role], callback);
 };
 
 module.exports.approveRegistration = (data, callback) => {
   const SQLSTATEMENT = `
-    UPDATE event_registrations
+    UPDATE event_registrations r
     SET status = 'Registered'
-    WHERE id = $1
-      AND status = 'Pending Approval'
-    RETURNING *;
+    FROM events e
+    WHERE r.id = $1
+      AND r.event_id = e.id
+      AND r.status = 'Pending Approval'
+      AND (
+        e.registration_deadline IS NULL
+        OR e.registration_deadline >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
+      )
+      AND (
+        SELECT COUNT(*)
+        FROM event_registrations existing
+        WHERE existing.event_id = e.id
+          AND existing.status = 'Registered'
+      ) < e.capacity
+    RETURNING r.*;
   `;
   pool.query(SQLSTATEMENT, [data.registration_id], callback);
 };
