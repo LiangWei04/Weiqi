@@ -29,6 +29,7 @@ module.exports.selectAll = (callback) => {
       c.arbiter_policy,
       c.rules_text,
       c.created_at,
+      (COALESCE(c.end_date, c.start_date) < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS is_archived,
       v.name AS venue_name,
       u.name AS organizer_name,
       tf.name AS tournament_format,
@@ -79,7 +80,7 @@ module.exports.selectAll = (callback) => {
     LEFT JOIN tournament_formats tf ON tf.id = cs.tournament_format_id
     LEFT JOIN scoring_systems ss ON ss.id = cs.scoring_system_id
     GROUP BY c.id, v.name, u.name, cs.competition_id, tf.name, ss.name
-    ORDER BY c.start_date DESC, c.id DESC;
+    ORDER BY is_archived ASC, c.start_date DESC, c.id DESC;
   `;
   pool.query(SQLSTATEMENT, callback);
 };
@@ -88,6 +89,7 @@ module.exports.selectById = (data, callback) => {
   const SQLSTATEMENT = `
     SELECT
       c.*,
+      (COALESCE(c.end_date, c.start_date) < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS is_archived,
       v.name AS venue_name,
       tf.name AS tournament_format,
       ss.name AS scoring_system,

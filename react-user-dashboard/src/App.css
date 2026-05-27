@@ -963,6 +963,128 @@
   align-items: center;
 }
 
+.event-social-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.reaction-chip,
+.comment-chip,
+.ghost-action {
+  border: 1px solid #2c2c2e;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #121212;
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.reaction-chip,
+.comment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reaction-chip.active {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.14);
+  color: #00e5ff;
+}
+
+.comment-chip {
+  margin-left: auto;
+}
+
+.event-chat-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 1px solid #2c2c2e;
+  border-radius: 18px;
+  padding: 18px;
+  background: #1e1e1e;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.58);
+}
+
+.comment-list {
+  display: grid;
+  gap: 12px;
+  overflow: auto;
+  padding: 4px 4px 14px;
+}
+
+.comment-bubble {
+  width: min(560px, 92%);
+  border: 1px solid #2c2c2e;
+  border-radius: 16px 16px 16px 4px;
+  padding: 12px;
+  background: #151515;
+}
+
+.own-comment {
+  justify-self: end;
+  border-color: rgba(0, 229, 255, 0.42);
+  border-radius: 16px 16px 4px 16px;
+  background: rgba(0, 229, 255, 0.08);
+}
+
+.comment-meta,
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.comment-meta small {
+  color: #98989d;
+  font-weight: 800;
+}
+
+.comment-bubble p {
+  margin: 8px 0;
+  color: #ffffff;
+}
+
+.comment-edit-box,
+.comment-compose {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-compose {
+  border-top: 1px solid #2c2c2e;
+  padding-top: 14px;
+}
+
+.comment-edit-box textarea,
+.comment-compose textarea {
+  width: 100%;
+  border: 1px solid #2c2c2e;
+  border-radius: 12px;
+  padding: 12px;
+  resize: vertical;
+  background: #121212;
+  color: #ffffff;
+}
+
+.ghost-action {
+  padding: 5px 9px;
+  background: transparent;
+  color: #98989d;
+}
+
+.danger-text {
+  color: #ff453a;
+}
+
 .compact-details {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1468,6 +1590,7 @@ th {
 }
 
 .tournament-workspace {
+  position: relative;
   width: min(1240px, 100%);
   max-height: calc(100vh - 56px);
   overflow: auto;
@@ -1478,6 +1601,55 @@ th {
     radial-gradient(circle at 82% 0%, rgba(0, 229, 255, 0.16), transparent 28%),
     #1e1e1e;
   box-shadow: 0 32px 110px rgba(0, 0, 0, 0.62);
+}
+
+.tournament-loading-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(18, 18, 18, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.tournament-loading-veil > div {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 360px;
+  border: 1px solid #2c2c2e;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  color: #ffffff;
+  background: #1e1e1e;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.42);
+}
+
+.tournament-loading-veil strong {
+  font-size: 1.1rem;
+}
+
+.tournament-loading-veil small {
+  color: #98989d;
+  font-weight: 800;
+}
+
+.loading-ring {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(0, 229, 255, 0.2);
+  border-top-color: #00e5ff;
+  border-radius: 999px;
+  animation: loading-spin 800ms linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tournament-workspace-head {
@@ -1512,6 +1684,32 @@ th {
 .tournament-tabs button.active {
   background: #00e5ff;
   color: #121212;
+}
+
+.competition-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.competition-detail-tabs button {
+  border: 1px solid #00e5ff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #121212;
+  background: #00e5ff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.competition-detail-tabs button:hover {
+  filter: brightness(1.08);
+}
+
+.competition-detail-tabs button.selected {
+  color: #ffffff;
+  background: #121212;
+  border-color: #2c2c2e;
 }
 
 .confirm-dialog {

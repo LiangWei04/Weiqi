@@ -88,6 +88,7 @@ module.exports = async function initTables() {
       capacity INTEGER NOT NULL CHECK (capacity > 0),
       status VARCHAR(30) NOT NULL DEFAULT 'Draft',
       requires_approval BOOLEAN NOT NULL DEFAULT FALSE,
+      pinned BOOLEAN NOT NULL DEFAULT FALSE,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -101,6 +102,11 @@ module.exports = async function initTables() {
   await db.query(`
     ALTER TABLE events
       ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
+  await db.query(`
+    ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
   await db.query(`
@@ -123,6 +129,30 @@ module.exports = async function initTables() {
       attended BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (user_id, event_id)
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS event_comments (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      comment_text TEXT NOT NULL,
+      edited_at TIMESTAMP,
+      deleted_at TIMESTAMP,
+      deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS event_reactions (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reaction_type VARCHAR(30) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (event_id, user_id)
     );
   `);
 
@@ -169,6 +199,27 @@ module.exports = async function initTables() {
       read_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS attendance_change_requests (
+      id SERIAL PRIMARY KEY,
+      activity_type VARCHAR(20) NOT NULL CHECK (activity_type IN ('Event', 'Competition')),
+      registration_id INTEGER NOT NULL,
+      requested_attended BOOLEAN NOT NULL,
+      reason TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
+      requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_one_pending
+    ON attendance_change_requests (activity_type, registration_id)
+    WHERE status = 'Pending';
   `);
 
   await db.query(`

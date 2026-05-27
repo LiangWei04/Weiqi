@@ -74,9 +74,9 @@ const rejectClosedOrFullEventRequests = async () => {
       UPDATE event_registrations r
       SET status = 'Rejected',
           attended = FALSE
-      FROM event_counts e
-      JOIN users u ON u.id = r.user_id
+      FROM event_counts e, users u
       WHERE r.event_id = e.id
+        AND u.id = r.user_id
         AND r.status = 'Pending Approval'
         AND (
           e.registration_deadline < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
@@ -124,9 +124,9 @@ const rejectClosedOrFullCompetitionRequests = async () => {
       UPDATE competition_registrations cr
       SET status = 'Rejected',
           attended = FALSE
-      FROM category_counts cc
-      JOIN users u ON u.id = cr.user_id
+      FROM category_counts cc, users u
       WHERE cr.category_id = cc.id
+        AND u.id = cr.user_id
         AND cr.status = 'Pending Approval'
         AND cc.requires_approval = TRUE
         AND (

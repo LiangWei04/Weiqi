@@ -67,6 +67,8 @@ const isAfterDate = (dateValue, compareDateValue) => {
   return new Date(dateValue) > new Date(compareDateValue);
 };
 
+const cleanCommentText = (value) => value.trim();
+
 module.exports.readAll = async (req, res) => {
   await runAutoRejections();
 
@@ -142,6 +144,7 @@ module.exports.updateEventById = (req, res) => {
     capacity: req.body.capacity,
     status: req.body.status,
     requiresApproval: req.body.requiresApproval === undefined ? undefined : Boolean(req.body.requiresApproval),
+    pinned: req.body.pinned === undefined ? undefined : Boolean(req.body.pinned),
   };
 
   model.selectNotificationRecipients(data, (recipientError, recipientResults) => {
@@ -280,4 +283,154 @@ module.exports.registerForEvent = (req, res) => {
       });
     });
   });
+};
+
+module.exports.readComments = (req, res) => {
+  model.selectComments(
+    {
+      event_id: req.params.event_id,
+      user_id: res.locals.userId,
+    },
+    (error, results) => {
+      if (error) {
+        console.error("Error read event comments:", error);
+        return res.status(500).json(error);
+      }
+
+      return res.status(200).json(results.rows);
+    }
+  );
+};
+
+module.exports.createComment = (req, res) => {
+  const commentText = cleanCommentText(req.body.commentText || "");
+  if (!commentText) {
+    return res.status(400).json({ message: "Comment cannot be empty" });
+  }
+
+  model.insertComment(
+    {
+      event_id: req.params.event_id,
+      user_id: res.locals.userId,
+      comment_text: commentText,
+    },
+    (error, results) => {
+      if (error) {
+        console.error("Error create event comment:", error);
+        if (error.code === "22P05") {
+          return res.status(400).json({ message: "This database cannot store emoji. Please remove emoji and try again." });
+        }
+        return res.status(500).json(error);
+      }
+
+      if (results.rows.length === 0) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      return res.status(201).json({
+        message: "Comment added",
+        comment: results.rows[0],
+      });
+    }
+  );
+};
+
+module.exports.updateComment = (req, res) => {
+  const commentText = cleanCommentText(req.body.commentText || "");
+  if (!commentText) {
+    return res.status(400).json({ message: "Comment cannot be empty" });
+  }
+
+  model.updateComment(
+    {
+      comment_id: req.params.comment_id,
+      user_id: res.locals.userId,
+      comment_text: commentText,
+    },
+    (error, results) => {
+      if (error) {
+        console.error("Error update event comment:", error);
+        if (error.code === "22P05") {
+          return res.status(400).json({ message: "This database cannot store emoji. Please remove emoji and try again." });
+        }
+        return res.status(500).json(error);
+      }
+
+      if (results.rows.length === 0) {
+        return res.status(403).json({ message: "Comments can only be edited by the author within 5 minutes" });
+      }
+
+      return res.status(200).json({
+        message: "Comment updated",
+        comment: results.rows[0],
+      });
+    }
+  );
+};
+
+module.exports.deleteComment = (req, res) => {
+  model.softDeleteComment(
+    {
+      comment_id: req.params.comment_id,
+      deleted_by: res.locals.userId,
+      can_moderate: ["Captain", "Vice-Captain", "Secretary"].includes(res.locals.role),
+    },
+    (error, results) => {
+      if (error) {
+        console.error("Error delete event comment:", error);
+        return res.status(500).json(error);
+      }
+
+      if (results.rows.length === 0) {
+        return res.status(403).json({ message: "You can only delete your own comment within 5 minutes. Excos can delete any comment." });
+      }
+
+      return res.status(200).json({ message: "Comment deleted" });
+    }
+  );
+};
+
+module.exports.updateReaction = (req, res) => {
+  const allowedReactions = ["like", "heart", "clap", "eyes"];
+  const reactionType = req.body.reactionType;
+  if (!allowedReactions.includes(reactionType)) {
+    return res.status(400).json({ message: "Invalid reaction" });
+  }
+
+  model.upsertReaction(
+    {
+      event_id: req.params.event_id,
+      user_id: res.locals.userId,
+      reaction_type: reactionType,
+    },
+    (error, results) => {
+      if (error) {
+        console.error("Error update event reaction:", error);
+        return res.status(500).json(error);
+      }
+
+      if (results.rows.length === 0) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      return res.status(200).json({ message: "Reaction updated", reaction: results.rows[0] });
+    }
+  );
+};
+
+module.exports.deleteReaction = (req, res) => {
+  model.deleteReaction(
+    {
+      event_id: req.params.event_id,
+      user_id: res.locals.userId,
+    },
+    (error) => {
+      if (error) {
+        console.error("Error delete event reaction:", error);
+        return res.status(500).json(error);
+      }
+
+      return res.status(200).json({ message: "Reaction removed" });
+    }
+  );
 };

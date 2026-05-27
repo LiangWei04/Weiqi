@@ -38,6 +38,10 @@ module.exports.selectActiveUserIds = (callback) => {
   pool.query("SELECT id FROM users WHERE active = TRUE;", callback);
 };
 
+module.exports.selectCaptainUserIds = (callback) => {
+  pool.query("SELECT id FROM users WHERE active = TRUE AND role = 'Captain';", callback);
+};
+
 module.exports.selectEventUserIds = (data, callback) => {
   const SQLSTATEMENT = `
     SELECT DISTINCT r.user_id AS id, e.title AS activity_title

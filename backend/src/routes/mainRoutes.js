@@ -9,6 +9,7 @@ const registrationRoutes = require("./registrationRoutes");
 const dashboardRoutes = require("./dashboardRoutes");
 const competitionRoutes = require("./competitionRoutes");
 const notificationRoutes = require("./notificationRoutes");
+const attendanceRequestRoutes = require("./attendanceRequestRoutes");
 
 router.post(
   "/auth/login",
@@ -50,5 +51,6 @@ router.use("/competitions", competitionRoutes);
 router.use("/registrations", registrationRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/attendance-requests", attendanceRequestRoutes);
 
 module.exports = router;
