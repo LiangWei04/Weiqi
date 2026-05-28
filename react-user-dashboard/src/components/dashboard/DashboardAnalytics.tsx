@@ -12,7 +12,7 @@ import {
 } from 'chart.js';
 import type { ChartData, ChartOptions } from 'chart.js';
 import { Bar, Bubble, Doughnut, Line } from 'react-chartjs-2';
-import type { CurrentUser, DashboardStats, MemberStats } from '../../types/dashboard';
+import type { CurrentUser, DashboardStats, MemberStats, NamedTotal } from '../../types/dashboard';
 import { formatDate, formatMonth, formatShortDate } from '../../utils/formatters';
 
 const chartPalette = {
@@ -46,6 +46,7 @@ const OverviewMetrics = ({
   eventCount,
   totalAttendance,
   attendanceRate,
+  stats,
 }: {
   competitionCount: number;
   totalRegistrations: number;
@@ -53,14 +54,26 @@ const OverviewMetrics = ({
   eventCount: number;
   totalAttendance: number;
   attendanceRate: number;
-}) => (
-  <section id="overview" className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Tournament metrics">
-    <MetricCard label="Competitions" value={competitionCount} hint="Active records" />
-    <MetricCard label="Events" value={eventCount} hint="CCA activities" />
+  stats?: DashboardStats | null;
+}) => {
+  const totalPending = (stats?.pending_registrations || 0) + (stats?.pending_competition_registrations || 0);
+  const totalCapacity = (stats?.open_event_capacity || 0) + (stats?.total_competition_capacity || 0);
+  const totalApproved = (stats?.approved_registrations || 0) + (stats?.approved_competition_registrations || 0);
+  const capacityUsage = totalCapacity === 0 ? 0 : Math.round((totalApproved / totalCapacity) * 100);
+
+  return (
+  <section id="overview" className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8" aria-label="Tournament metrics">
+    <MetricCard label="Competitions" value={competitionCount} hint={`${stats?.open_competitions || 0} open, ${stats?.draft_competitions || 0} draft`} />
+    <MetricCard label="Events" value={eventCount} hint={`${stats?.open_events || 0} open, ${stats?.upcoming_events || 0} upcoming`} />
     <MetricCard label="Registrations" value={totalRegistrations} hint={`${pendingApprovals} pending approval`} />
     <MetricCard label="Attendance" value={`${attendanceRate}%`} hint={`${totalAttendance} marked present`} />
+    <MetricCard label="Members" value={stats?.total_users ?? '-'} hint={`${stats?.active_members || 0} active, ${stats?.inactive_users || 0} inactive`} />
+    <MetricCard label="Pending Queue" value={totalPending} hint="event and competition requests" />
+    <MetricCard label="Seat Usage" value={`${capacityUsage}%`} hint={`${totalApproved}/${totalCapacity} approved seats`} />
+    <MetricCard label="Engagement" value={(stats?.event_comment_count || 0) + (stats?.event_reaction_count || 0)} hint={`${stats?.unread_notification_count || 0} unread notices`} />
   </section>
-);
+  );
+};
 
 const MemberStatsDashboard = ({
   stats,
@@ -190,6 +203,49 @@ const MemberStatsDashboard = ({
       borderRadius: 8,
     }],
   };
+  const excoRoles = new Set(['Captain', 'Vice-Captain', 'Secretary']);
+  const isExco = Boolean(currentUser?.role && excoRoles.has(currentUser.role));
+  const contributionItems = stats.exco_contribution_breakdown.filter((item) => item.total > 0);
+  const contributionData: ChartData<'doughnut'> = {
+    labels: contributionItems.length > 0 ? contributionItems.map((item) => item.name || 'Contribution') : ['No management actions'],
+    datasets: [{
+      data: contributionItems.length > 0 ? contributionItems.map((item) => item.total) : [1],
+      backgroundColor: contributionItems.length > 0
+        ? [chartPalette.cyan, chartPalette.green, chartPalette.amber, chartPalette.blue, chartPalette.purple, chartPalette.red]
+        : ['rgba(255,255,255,0.12)'],
+      borderColor: '#1e1e1e',
+      borderWidth: 2,
+    }],
+  };
+  const managementLoadData: ChartData<'bar'> = {
+    labels: stats.managed_activity_load.map((item) => item.activity_type),
+    datasets: [
+      {
+        label: 'Total signups',
+        data: stats.managed_activity_load.map((item) => item.total_signups),
+        backgroundColor: 'rgba(0, 229, 255, 0.28)',
+        borderColor: chartPalette.cyan,
+        borderWidth: 1,
+        borderRadius: 8,
+      },
+      {
+        label: 'Pending',
+        data: stats.managed_activity_load.map((item) => item.pending),
+        backgroundColor: chartPalette.amber,
+        borderRadius: 8,
+      },
+      {
+        label: 'Attended',
+        data: stats.managed_activity_load.map((item) => item.attended),
+        backgroundColor: chartPalette.green,
+        borderRadius: 8,
+      },
+    ],
+  };
+  const managedTotalSignups = stats.managed_event_signups + stats.managed_competition_signups;
+  const managedPending = stats.managed_event_pending + stats.managed_competition_pending;
+  const managedAttended = stats.managed_event_attended + stats.managed_competition_attended;
+  const managedAttendanceRate = managedTotalSignups === 0 ? 0 : Math.round((managedAttended / managedTotalSignups) * 100);
 
   return (
     <section className="grid gap-4" aria-label="Member dashboard">
@@ -223,6 +279,33 @@ const MemberStatsDashboard = ({
         <MetricCard label="Best Finish" value={stats.best_finish ? `#${stats.best_finish}` : '-'} hint="best latest standing" />
         <MetricCard label="Achievements" value={stats.top10_count} hint={`${stats.first_place_count} first, ${stats.top5_count} top 5`} />
       </section>
+
+      {isExco && (
+        <>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Managed Activities" value={stats.events_created + stats.competitions_organized} hint={`${stats.events_created} events, ${stats.competitions_organized} competitions`} />
+            <MetricCard label="Managed Signups" value={managedTotalSignups} hint={`${managedPending} waiting for action`} />
+            <MetricCard label="Managed Attendance" value={`${managedAttendanceRate}%`} hint={`${managedAttended} marked present`} />
+            <MetricCard label="Tournament Ops" value={stats.rounds_generated} hint={`${stats.attendance_requests_reviewed} attendance reviews`} />
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-12">
+            <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+              <ChartHeader title="My contribution as an Exco" subtitle="Management actions by type." />
+              <div className="h-[280px]">
+                <Doughnut data={contributionData} options={doughnutOptions} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-8">
+              <ChartHeader title="Activities I Manage" subtitle="Signup load, pending queue and attendance outcomes for events or competitions under this account." />
+              <div className="h-[280px]">
+                <Bar data={managementLoadData} options={barOptions} />
+              </div>
+            </section>
+          </div>
+        </>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-12">
         <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
@@ -532,6 +615,23 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
   const capacityRiskCount = stats.competition_capacity.filter((item) => item.fill_rate >= 80).length;
   const conversionRate = funnelTotal === 0 ? 0 : Math.round((approvedTotal / funnelTotal) * 100);
   const rejectionRate = funnelTotal === 0 ? 0 : Math.round((rejectedTotal / funnelTotal) * 100);
+  const totalActivityCount = stats.total_events + stats.total_competitions;
+  const openActivityCount = stats.open_events + stats.open_competitions + stats.in_progress_competitions;
+  const draftActivityCount = stats.draft_events + stats.draft_competitions;
+  const archivedActivityCount = stats.archived_events + stats.archived_competitions;
+  const totalPendingQueue = stats.pending_registrations + stats.pending_competition_registrations;
+  const totalRejectedQueue = stats.rejected_registrations + stats.rejected_competition_registrations;
+  const totalApprovedQueue = stats.approved_registrations + stats.approved_competition_registrations;
+  const totalSeatCapacity = stats.open_event_capacity + stats.total_competition_capacity;
+  const overallSeatUsage = totalSeatCapacity === 0 ? 0 : Math.round((totalApprovedQueue / totalSeatCapacity) * 100);
+  const matchCompletionRate = stats.total_competition_matches === 0
+    ? 0
+    : Math.round((stats.completed_competition_matches / stats.total_competition_matches) * 100);
+  const engagementCount = stats.event_comment_count + stats.event_reaction_count;
+  const engagementPerOpenEvent = stats.open_events === 0 ? 0 : Math.round(engagementCount / stats.open_events);
+  const approvalLoadRate = (stats.pending_registrations + stats.pending_competition_registrations) === 0
+    ? 0
+    : Math.round((stats.pending_competition_registrations / totalPendingQueue) * 100);
 
   const funnelData: ChartData<'bar'> = {
     labels: funnelItems.map((item) => item.label),
@@ -651,6 +751,35 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
       },
     ],
   };
+  const roleItems = stats.role_breakdown.length > 0
+    ? stats.role_breakdown
+    : [{ role: 'No members', total: 0 } as NamedTotal];
+  const roleData: ChartData<'doughnut'> = {
+    labels: roleItems.map((item) => item.role || item.name || 'Unknown'),
+    datasets: [{
+      data: roleItems.map((item) => item.total),
+      backgroundColor: [chartPalette.cyan, chartPalette.green, chartPalette.amber, chartPalette.blue, chartPalette.purple, chartPalette.red],
+      borderColor: '#1e1e1e',
+      borderWidth: 2,
+    }],
+  };
+  const workflowData: ChartData<'bar'> = {
+    labels: ['Open', 'Draft', 'Archived', 'Cancelled'],
+    datasets: [
+      {
+        label: 'Events',
+        data: [stats.open_events, stats.draft_events, stats.archived_events, stats.cancelled_events],
+        backgroundColor: chartPalette.cyan,
+        borderRadius: 8,
+      },
+      {
+        label: 'Competitions',
+        data: [stats.open_competitions + stats.in_progress_competitions, stats.draft_competitions, stats.archived_competitions, stats.cancelled_competitions],
+        backgroundColor: chartPalette.green,
+        borderRadius: 8,
+      },
+    ],
+  };
 
   return (
     <section className="grid gap-4" aria-label="Tournament analytics">
@@ -667,6 +796,10 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
           <Insight label="Hot Category" value={topCategory?.category_name || 'No data'} detail={`${topCategory?.demand || 0} requests`} />
           <Insight label="Main Venue" value={topVenue?.venue_name || 'No data'} detail={`${topVenue?.total_demand || 0} total demand`} />
           <Insight label="Approval Rate" value={`${stats.competition_approval_rate || 0}%`} detail={`${stats.pending_competition_registrations || 0} pending requests`} />
+          <Insight label="Verification" value={`${stats.verification_rate || 0}%`} detail={`${stats.unverified_users || 0} unverified account(s)`} />
+          <Insight label="Most Popular" value={stats.most_popular_event || 'No event yet'} detail="event by signup count" />
+          <Insight label="Matches Done" value={`${matchCompletionRate}%`} detail={`${stats.scheduled_competition_matches} still scheduled`} />
+          <Insight label="Ranking Snapshots" value={String(stats.ranking_snapshot_count || 0)} detail="saved standings records" />
         </div>
       </div>
 
@@ -677,7 +810,32 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
         <SignalCard label="Capacity Risk" value={capacityRiskCount} detail="competitions above 80% fill" tone={capacityRiskCount > 0 ? 'warn' : 'good'} />
       </div>
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <SignalCard label="Active Members" value={stats.active_members} detail={`${stats.inactive_users} inactive account(s)`} tone={stats.active_members > 0 ? 'good' : 'warn'} />
+        <SignalCard label="Open Activities" value={openActivityCount} detail={`${totalActivityCount} total records`} tone={openActivityCount > 0 ? 'good' : 'warn'} />
+        <SignalCard label="Drafts" value={draftActivityCount} detail="not visible to members yet" tone={draftActivityCount > 0 ? 'warn' : 'good'} />
+        <SignalCard label="Archived" value={archivedActivityCount} detail="past events and competitions" tone="good" />
+        <SignalCard label="Total Pending" value={totalPendingQueue} detail={`${approvalLoadRate}% from competitions`} tone={totalPendingQueue > 0 ? 'warn' : 'good'} />
+        <SignalCard label="Rejected" value={totalRejectedQueue} detail="closed or declined requests" tone={totalRejectedQueue > 0 ? 'warn' : 'good'} />
+        <SignalCard label="Seat Usage" value={`${overallSeatUsage}%`} detail={`${totalApprovedQueue}/${totalSeatCapacity} approved seats`} tone={overallSeatUsage >= 90 ? 'danger' : overallSeatUsage >= 70 ? 'warn' : 'good'} />
+        <SignalCard label="Engagement" value={engagementCount} detail={`${engagementPerOpenEvent} per open event`} tone={engagementCount > 0 ? 'good' : 'warn'} />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
+          <ChartHeader title="Member Role Mix" subtitle="Role distribution helps show whether the system has enough exco coverage." />
+          <div className="h-[300px]">
+            <Doughnut data={roleData} options={doughnutOptions} />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-8">
+          <ChartHeader title="Activity Workflow Inventory" subtitle="Current lifecycle state for events and competitions: open, draft, archived and cancelled." />
+          <div className="h-[300px]">
+            <Bar data={workflowData} options={barOptions} />
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-12">
           <ChartHeader title="Registration Trend" subtitle="Daily signups plus cumulative growth. Use this to spot campaign spikes, deadline rushes, and quiet periods." />
           <div className="h-[360px]">

@@ -1,4 +1,5 @@
 import { startOfDay } from '../shared/DatePickerField';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 export const compareActivityDates = (leftDate?: string | null, rightDate?: string | null) => {
   const today = startOfDay(new Date()).getTime();
@@ -80,11 +81,4 @@ export const formatRank = (rankType?: string | null, rankValue?: number | null) 
   return `${rankValue} ${rankType}`;
 };
 
-export const getErrorMessage = (error: unknown, fallback: string) => {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
-    return response?.data?.message || response?.data?.error || fallback;
-  }
-
-  return fallback;
-};
+export const getErrorMessage = getApiErrorMessage;

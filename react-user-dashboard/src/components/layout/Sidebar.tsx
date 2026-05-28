@@ -3,10 +3,11 @@ import { NavLink } from 'react-router-dom';
 
 interface SidebarProps {
   canManageAttendance: boolean;
+  canManageMembers: boolean;
   canManageUsers: boolean;
 }
 
-const Sidebar = ({ canManageAttendance, canManageUsers }: SidebarProps) => (
+const Sidebar = ({ canManageAttendance, canManageMembers, canManageUsers }: SidebarProps) => (
   <aside className="flex h-auto flex-col gap-6 border-r border-app-border bg-[#151515] p-5 lg:sticky lg:top-0 lg:h-screen lg:p-7">
     <div className="flex items-center gap-3">
       <span className="grid h-11 w-11 place-items-center rounded-lg bg-app-cyan font-black text-app-ink">TH</span>
@@ -20,6 +21,7 @@ const Sidebar = ({ canManageAttendance, canManageUsers }: SidebarProps) => (
       <SideNavLink to="/events">Events</SideNavLink>
       <SideNavLink to="/competitions">Competitions</SideNavLink>
       {canManageAttendance && <SideNavLink to="/attendance">Attendance</SideNavLink>}
+      {canManageMembers && <SideNavLink to="/members">Members</SideNavLink>}
       {canManageUsers && <SideNavLink to="/users">Users</SideNavLink>}
     </nav>
     <NavLink

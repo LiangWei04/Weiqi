@@ -52,6 +52,8 @@ module.exports.readMemberStats = (req, res) => {
       status_breakdown: stats.status_breakdown || [],
       type_breakdown: stats.type_breakdown || [],
       monthly_activity: stats.monthly_activity || [],
+      exco_contribution_breakdown: stats.exco_contribution_breakdown || [],
+      managed_activity_load: stats.managed_activity_load || [],
       upcoming_activities: stats.upcoming_activities || [],
     });
   });

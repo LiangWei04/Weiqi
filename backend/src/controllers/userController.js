@@ -158,14 +158,103 @@ module.exports.register = (req, res) => {
   });
 };
 
-module.exports.forgotPassword = (req, res) => {
+module.exports.forgotPassword = async (req, res) => {
   const identifier = req.body.identifier || req.body.email || req.body.username;
   if (!identifier || identifier.trim() === "") {
     return res.status(400).json({ message: "username or email is undefined or empty" });
   }
 
-  return res.status(200).json({
-    message: "If this email exists, a password reset link will be sent.",
+  const email = identifier.trim().toLowerCase();
+  const resetCode = String(crypto.randomInt(100000, 1000000));
+  const codeHash = await bcrypt.hash(resetCode, 10);
+
+  model.setPasswordResetCodeByEmail({ email, codeHash }, async (error, results) => {
+    if (error) {
+      console.error("Error setPasswordResetCodeByEmail:", error);
+      return res.status(500).json(error);
+    }
+
+    if (results.rows.length === 0) {
+      return res.status(200).json({
+        message: "If this email is registered, a password reset code will be sent.",
+      });
+    }
+
+    const user = results.rows[0];
+    try {
+      const emailResult = await emailService.sendPasswordResetCodeEmail({
+        to: user.email,
+        name: user.name,
+        resetCode,
+      });
+
+      return res.status(200).json({
+        message: emailResult.sent
+          ? "Password reset code sent. Please check your email."
+          : "Email sending is not configured yet.",
+        emailSent: emailResult.sent,
+        resetCode: emailResult.sent ? undefined : resetCode,
+      });
+    } catch (emailError) {
+      console.error("Error sending password reset email:", emailError);
+      return res.status(200).json({
+        message: "Could not send the reset email. Check SMTP settings and try again.",
+        emailSent: false,
+      });
+    }
+  });
+};
+
+module.exports.resetPassword = (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  const resetCode = (req.body.code || req.body.resetCode || "").trim();
+  const newPassword = req.body.password || req.body.newPassword || "";
+
+  if (!email) {
+    return res.status(400).json({ message: "email is undefined or empty" });
+  }
+
+  if (!/^\d{6}$/.test(resetCode)) {
+    return res.status(400).json({ message: "Reset code must be 6 digits" });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: "new password must be at least 8 characters" });
+  }
+
+  model.readPasswordResetByEmail({ email }, async (error, results) => {
+    if (error) {
+      console.error("Error readPasswordResetByEmail:", error);
+      return res.status(500).json(error);
+    }
+
+    if (results.rows.length === 0) {
+      return res.status(400).json({ message: "Reset code is invalid or expired" });
+    }
+
+    const user = results.rows[0];
+    if (!user.active) {
+      return res.status(403).json({ message: "Account is inactive" });
+    }
+
+    if (!user.password_reset_code_hash || !user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
+      return res.status(400).json({ message: "Reset code is invalid or expired" });
+    }
+
+    const isCodeValid = await bcrypt.compare(resetCode, user.password_reset_code_hash);
+    if (!isCodeValid) {
+      return res.status(400).json({ message: "Reset code is invalid or expired" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    model.updatePasswordById({ user_id: user.id, passwordHash }, (updateError) => {
+      if (updateError) {
+        console.error("Error resetPassword updatePasswordById:", updateError);
+        return res.status(500).json(updateError);
+      }
+
+      return res.status(200).json({ message: "Password reset successfully. You can now login." });
+    });
   });
 };
 

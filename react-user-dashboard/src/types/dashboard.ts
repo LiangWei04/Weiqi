@@ -160,6 +160,7 @@ export interface ManagedUser {
 
 export interface NamedTotal {
   name?: string;
+  role?: string;
   status?: string;
   total: number;
 }
@@ -213,15 +214,59 @@ export interface AttendancePoint {
 
 export interface DashboardStats {
   total_users: number;
+  active_members: number;
+  inactive_users: number;
+  verified_users: number;
+  unverified_users: number;
+  verification_rate: number;
   total_events: number;
+  open_events: number;
+  draft_events: number;
+  cancelled_events: number;
+  pinned_events: number;
+  upcoming_events: number;
+  archived_events: number;
+  open_event_capacity: number;
+  approval_required_events: number;
+  total_registrations: number;
+  approved_registrations: number;
+  pending_registrations: number;
+  rejected_registrations: number;
+  total_attended: number;
+  attendance_rate: number;
+  approval_rate: number;
+  most_popular_event: string | null;
+  role_breakdown: NamedTotal[];
+  user_status_breakdown: NamedTotal[];
+  registration_status_breakdown: NamedTotal[];
+  event_comment_count: number;
+  event_reaction_count: number;
+  notification_count: number;
+  unread_notification_count: number;
   total_competitions: number;
   open_competitions: number;
+  draft_competitions: number;
+  in_progress_competitions: number;
+  completed_competitions: number;
+  cancelled_competitions: number;
+  upcoming_competitions: number;
+  archived_competitions: number;
   total_categories: number;
+  total_competition_capacity: number;
   total_competition_registrations: number;
   pending_competition_registrations: number;
   approved_competition_registrations: number;
+  waitlisted_competition_registrations: number;
+  rejected_competition_registrations: number;
+  attended_competition_registrations: number;
   competition_approval_rate: number;
   competition_attendance_rate: number;
+  total_competition_rounds: number;
+  open_competition_rounds: number;
+  total_competition_matches: number;
+  scheduled_competition_matches: number;
+  completed_competition_matches: number;
+  ranking_snapshot_count: number;
   competition_status_breakdown: NamedTotal[];
   format_breakdown: NamedTotal[];
   competition_registration_funnel: NamedTotal[];
@@ -280,6 +325,13 @@ export interface MemberCompetitionAchievement {
   losses: number;
 }
 
+export interface ManagedActivityLoadPoint {
+  activity_type: string;
+  total_signups: number;
+  pending: number;
+  attended: number;
+}
+
 export interface MemberStats {
   total_registrations: number;
   event_registrations: number;
@@ -306,9 +358,24 @@ export interface MemberStats {
   top5_count: number;
   top10_count: number;
   best_finish: number | null;
+  events_created: number;
+  competitions_organized: number;
+  rounds_generated: number;
+  comments_posted: number;
+  reactions_made: number;
+  attendance_requests_made: number;
+  attendance_requests_reviewed: number;
+  managed_event_signups: number;
+  managed_event_pending: number;
+  managed_event_attended: number;
+  managed_competition_signups: number;
+  managed_competition_pending: number;
+  managed_competition_attended: number;
   status_breakdown: NamedTotal[];
   type_breakdown: NamedTotal[];
   monthly_activity: MemberTrendPoint[];
+  exco_contribution_breakdown: NamedTotal[];
+  managed_activity_load: ManagedActivityLoadPoint[];
   competition_result_breakdown: NamedTotal[];
   opponent_records: MemberOpponentRecord[];
   recent_matches: MemberRecentMatch[];

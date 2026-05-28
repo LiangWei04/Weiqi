@@ -15,6 +15,8 @@ module.exports = async function initTables() {
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
       email_verification_token VARCHAR(255),
       email_verification_expires TIMESTAMP,
+      password_reset_code_hash VARCHAR(255),
+      password_reset_expires TIMESTAMP,
       auth_provider VARCHAR(40) NOT NULL DEFAULT 'local',
       provider_id VARCHAR(255),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -32,6 +34,8 @@ module.exports = async function initTables() {
       ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255),
       ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS password_reset_code_hash VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP,
       ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(40) NOT NULL DEFAULT 'local',
       ADD COLUMN IF NOT EXISTS provider_id VARCHAR(255),
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -434,8 +438,8 @@ module.exports = async function initTables() {
     INSERT INTO roles (name, description)
     VALUES
       ('Captain', 'Full tournament and user administration'),
-      ('Vice-Captain', 'Competition setup and match operations'),
-      ('Secretary', 'Registration, attendance and result operations'),
+      ('Vice-Captain', 'Attendance marking operations'),
+      ('Secretary', 'Event, competition, registration and member operations'),
       ('Member', 'Participant access')
     ON CONFLICT (name) DO NOTHING;
   `);

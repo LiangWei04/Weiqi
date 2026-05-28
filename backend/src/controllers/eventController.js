@@ -373,7 +373,7 @@ module.exports.deleteComment = (req, res) => {
     {
       comment_id: req.params.comment_id,
       deleted_by: res.locals.userId,
-      can_moderate: ["Captain", "Vice-Captain", "Secretary"].includes(res.locals.role),
+      can_moderate: ["Captain", "Secretary"].includes(res.locals.role),
     },
     (error, results) => {
       if (error) {

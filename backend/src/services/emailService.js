@@ -54,6 +54,42 @@ module.exports.sendVerificationEmail = async ({ to, name, verificationLink }) =>
   return { sent: true };
 };
 
+module.exports.sendPasswordResetCodeEmail = async ({ to, name, resetCode }) => {
+  if (!hasEmailConfig()) {
+    return {
+      sent: false,
+      reason: "Email SMTP settings are not configured.",
+    };
+  }
+
+  const transporter = createTransporter();
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject: "Your TourneysHub password reset code",
+    text: [
+      `Hi ${name || "there"},`,
+      "",
+      "Use this verification code to reset your TourneysHub password:",
+      resetCode,
+      "",
+      "This code will expire in 15 minutes.",
+      "If you did not request this, you can ignore this email.",
+    ].join("\n"),
+    html: `
+      <p>Hi ${name || "there"},</p>
+      <p>Use this verification code to reset your TourneysHub password:</p>
+      <p style="font-size: 24px; font-weight: 700; letter-spacing: 4px;">${resetCode}</p>
+      <p>This code will expire in 15 minutes.</p>
+      <p>If you did not request this, you can ignore this email.</p>
+    `,
+  });
+
+  return { sent: true };
+};
+
 module.exports.sendActivityChangeEmail = async ({ to, name, activityType, activityTitle, action, reason }) => {
   if (!hasEmailConfig()) {
     return {

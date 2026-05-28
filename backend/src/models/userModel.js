@@ -42,6 +42,16 @@ module.exports.readUserByEmail = (data, callback) => {
   pool.query(SQLSTATEMENT, [data.email], callback);
 };
 
+module.exports.readPasswordResetByEmail = (data, callback) => {
+  const SQLSTATEMENT = `
+    SELECT id, name, email, password_hash, active, auth_provider,
+      password_reset_code_hash, password_reset_expires
+    FROM users
+    WHERE LOWER(email) = LOWER($1);
+  `;
+  pool.query(SQLSTATEMENT, [data.email], callback);
+};
+
 module.exports.readUserByIdentifier = (data, callback) => {
   const SQLSTATEMENT = `
     SELECT id, name, username, email, password_hash, role, active, status, email_verified, auth_provider
@@ -132,11 +142,25 @@ module.exports.updatePasswordById = (data, callback) => {
   const SQLSTATEMENT = `
     UPDATE users
     SET password_hash = $1,
+        password_reset_code_hash = NULL,
+        password_reset_expires = NULL,
         auth_provider = CASE WHEN auth_provider = 'google' THEN auth_provider ELSE 'local' END
     WHERE id = $2
     RETURNING id, name, username, email, role, active, status, email_verified, auth_provider, created_at;
   `;
   pool.query(SQLSTATEMENT, [data.passwordHash, data.user_id], callback);
+};
+
+module.exports.setPasswordResetCodeByEmail = (data, callback) => {
+  const SQLSTATEMENT = `
+    UPDATE users
+    SET password_reset_code_hash = $1,
+        password_reset_expires = NOW() + INTERVAL '15 minutes'
+    WHERE LOWER(email) = LOWER($2)
+      AND active = TRUE
+    RETURNING id, name, email;
+  `;
+  pool.query(SQLSTATEMENT, [data.codeHash, data.email], callback);
 };
 
 module.exports.upsertSettings = (data, callback) => {

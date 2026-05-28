@@ -155,8 +155,8 @@ const SettingsPanel = ({
           </div>
           <div className="permission-grid settings-permission-grid">
             <PermissionCard role="Captain" permissions="Users, roles, events, competitions, approvals, attendance" />
-            <PermissionCard role="Vice-Captain" permissions="Events, competitions, approvals, attendance" />
-            <PermissionCard role="Secretary" permissions="Approvals and attendance" />
+            <PermissionCard role="Vice-Captain" permissions="Attendance marking only" />
+            <PermissionCard role="Secretary" permissions="Events, competitions, registration approvals, member records" />
             <PermissionCard role="Member" permissions="View events, view competitions, register" />
           </div>
         </section>

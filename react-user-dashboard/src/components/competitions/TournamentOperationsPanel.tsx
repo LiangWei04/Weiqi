@@ -1,6 +1,7 @@
 import React from 'react';
 import apiClient from '../../utils/apiClient';
 import type { TournamentData } from '../../types/dashboard';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const SignalCard = ({
   label,
@@ -86,6 +87,15 @@ const TournamentOperationsPanel = ({
       .filter((match) => Number(match.round_number) === latestRoundNumber)
       .sort((a, b) => a.table_number - b.table_number)
     : [];
+  const unresolvedLatestRoundMatches = latestRoundMatches.filter((match) => match.result === 'Scheduled');
+  const playerBlockMessage = selectedCategory && selectedCategory.player_count === 0
+    ? 'This category has no approved players yet. Approve registrations before generating pairings.'
+    : '';
+  const roundBlockMessage = latestRoundNumber > 0 && unresolvedLatestRoundMatches.length > 0
+    ? `Round ${latestRoundNumber} still has ${unresolvedLatestRoundMatches.length} scheduled match${unresolvedLatestRoundMatches.length === 1 ? '' : 'es'}. Enter all results before generating Round ${latestRoundNumber + 1}.`
+    : '';
+  const actionBlockMessage = playerBlockMessage || roundBlockMessage;
+  const canGenerateNextRound = Boolean(selectedCategory) && !actionBlockMessage && !roundGenerating && !resultUpdating;
 
   React.useEffect(() => {
     if (!selectedCategoryId && categories[0]) {
@@ -98,12 +108,19 @@ const TournamentOperationsPanel = ({
       return;
     }
 
+    if (actionBlockMessage) {
+      await onChanged(actionBlockMessage);
+      return;
+    }
+
     setRoundGenerating(true);
     const minimumDelay = new Promise((resolve) => window.setTimeout(resolve, 1200));
 
     try {
       const response = await apiClient.post<{ message: string }>(`/competitions/${competitionId}/categories/${selectedCategory.id}/rounds/generate`);
       await onChanged(response.data.message);
+    } catch (error) {
+      await onChanged(getApiErrorMessage(error, 'Could not generate the next round. Complete the current round and try again.'));
     } finally {
       await minimumDelay;
       setRoundGenerating(false);
@@ -180,11 +197,22 @@ const TournamentOperationsPanel = ({
                     subtitle="Only the latest round is shown here. Standings remain cumulative across all rounds."
                   />
                   {canManage && (
-                    <button type="button" className="primary-action compact" disabled={!selectedCategory || roundGenerating || resultUpdating} onClick={generateRound}>
+                    <button
+                      type="button"
+                      className={`primary-action compact ${!canGenerateNextRound ? 'is-disabled' : ''}`}
+                      aria-disabled={!canGenerateNextRound}
+                      onClick={generateRound}
+                      title={actionBlockMessage || undefined}
+                    >
                       Generate Next Round
                     </button>
                   )}
                 </div>
+                {actionBlockMessage && (
+                  <div className="mb-4 rounded-xl border border-app-amber/60 bg-app-amber/10 px-4 py-3 text-sm font-bold text-app-amber" role="status">
+                    {actionBlockMessage}
+                  </div>
+                )}
                 <div className="grid gap-3">
                   {latestRoundMatches.map((match) => (
                     <article key={match.id} className="grid gap-3 rounded-lg border border-app-border bg-[#181818] p-3 md:grid-cols-[150px_minmax(0,1fr)_220px] md:items-center">

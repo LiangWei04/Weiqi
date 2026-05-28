@@ -23,10 +23,9 @@ const AttendancePanel = ({
   onStatusChanged: (message: string) => void;
 }) => {
   const [activityFilter, setActivityFilter] = React.useState('All');
-  const [attendanceStatusFilter, setAttendanceStatusFilter] = React.useState('All');
   const [queueFilter, setQueueFilter] = React.useState('All');
   const [queuePage, setQueuePage] = React.useState(1);
-  const [attendancePage, setAttendancePage] = React.useState(1);
+  const [selectedAttendanceActivityKey, setSelectedAttendanceActivityKey] = React.useState<string | null>(null);
   const [requestTarget, setRequestTarget] = React.useState<{
     id: number;
     type: 'Competition' | 'Event';
@@ -68,17 +67,11 @@ const AttendancePanel = ({
   });
   const filteredCompetitionAttendance = approvedCompetitionRegistrations.filter((registration) => {
     const matchesActivity = activityFilter === 'All' || activityFilter === `Competition: ${registration.competition_title}`;
-    const matchesAttendance = attendanceStatusFilter === 'All'
-      || (attendanceStatusFilter === 'Present' && registration.attended)
-      || (attendanceStatusFilter === 'Absent' && !registration.attended);
-    return matchesActivity && matchesAttendance;
+    return matchesActivity;
   });
   const filteredEventAttendance = approvedEventRegistrations.filter((registration) => {
     const matchesActivity = activityFilter === 'All' || activityFilter === `Event: ${registration.event_title}`;
-    const matchesAttendance = attendanceStatusFilter === 'All'
-      || (attendanceStatusFilter === 'Present' && registration.attended)
-      || (attendanceStatusFilter === 'Absent' && !registration.attended);
-    return matchesActivity && matchesAttendance;
+    return matchesActivity;
   });
   const queueRows = [
     ...filteredPendingCompetitionRegistrations.map((registration) => ({
@@ -122,16 +115,45 @@ const AttendancePanel = ({
     || left.detail.localeCompare(right.detail)
     || left.name.localeCompare(right.name)
   ));
+  const attendanceActivities = Array.from(attendanceRows.reduce((activities, row) => {
+    const key = `${row.type}:${row.detail}`;
+    const existingActivity = activities.get(key);
+    if (existingActivity) {
+      existingActivity.rows.push(row);
+      existingActivity.present += row.attended ? 1 : 0;
+      return activities;
+    }
+
+    activities.set(key, {
+      key,
+      type: row.type,
+      detail: row.detail,
+      activityDate: row.activityDate,
+      rows: [row],
+      present: row.attended ? 1 : 0,
+    });
+    return activities;
+  }, new Map<string, {
+    key: string;
+    type: 'Competition' | 'Event';
+    detail: string;
+    activityDate: string;
+    present: number;
+    rows: typeof attendanceRows;
+  }>()).values()).sort((left, right) => (
+    compareActivityDates(left.activityDate, right.activityDate)
+    || left.detail.localeCompare(right.detail)
+  ));
+  const selectedAttendanceActivity = attendanceActivities.find((activity) => activity.key === selectedAttendanceActivityKey) || null;
   const queueSlice = paginate(queueRows, queuePage, 8);
-  const attendanceSlice = paginate(attendanceRows, attendancePage, 10);
 
   React.useEffect(() => {
     setQueuePage(1);
   }, [queueFilter]);
 
   React.useEffect(() => {
-    setAttendancePage(1);
-  }, [activityFilter, attendanceStatusFilter]);
+    setSelectedAttendanceActivityKey(null);
+  }, [activityFilter]);
 
   const updateCompetitionStatus = async (registrationId: number, status: string) => {
     try {
@@ -166,6 +188,40 @@ const AttendancePanel = ({
       onStatusChanged('Event attendance updated.');
     } catch (error) {
       onStatusChanged(getErrorMessage(error, 'Could not update event attendance.'));
+    }
+  };
+
+  const markActivityPresent = async () => {
+    if (!selectedAttendanceActivity) {
+      return;
+    }
+
+    const blockedRows = selectedAttendanceActivity.rows.filter((registration) => {
+      const attendanceState = getAttendanceMarkingState(registration.activityDate, currentRole);
+      return !attendanceState.canMark;
+    });
+    if (blockedRows.length > 0) {
+      const firstBlocked = blockedRows[0];
+      const attendanceState = getAttendanceMarkingState(firstBlocked.activityDate, currentRole);
+      onStatusChanged(attendanceState.help);
+      return;
+    }
+
+    const rowsToUpdate = selectedAttendanceActivity.rows.filter((registration) => !registration.attended);
+    if (rowsToUpdate.length === 0) {
+      onStatusChanged('Everyone in this activity is already marked present.');
+      return;
+    }
+
+    try {
+      await Promise.all(rowsToUpdate.map((registration) => (
+        registration.type === 'Competition'
+          ? apiClient.put(`/competitions/registrations/${registration.id}/attendance`, { attended: true })
+          : apiClient.put(`/registrations/${registration.id}/attendance`, { attended: true })
+      )));
+      onStatusChanged(`Marked ${rowsToUpdate.length} member${rowsToUpdate.length === 1 ? '' : 's'} present for ${selectedAttendanceActivity.detail}.`);
+    } catch (error) {
+      onStatusChanged(getErrorMessage(error, 'Could not mark everyone present for this activity.'));
     }
   };
 
@@ -211,9 +267,11 @@ const AttendancePanel = ({
           <p className="eyebrow">Pending approvals</p>
           <h2>Registration Queue</h2>
         </div>
-        <NavLink to="/members" className="secondary-action compact">
-          Manage Members
-        </NavLink>
+        {canApprove && (
+          <NavLink to="/members" className="secondary-action compact">
+            Manage Members
+          </NavLink>
+        )}
       </div>
       {currentRole === 'Captain' && (
         <div className="panel-section">
@@ -295,94 +353,108 @@ const AttendancePanel = ({
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Attendance tracking</p>
-            <h2>Approved Signups</h2>
+            <h2>Activities</h2>
           </div>
         </div>
-        <div className="attendance-filter-row">
-          <label className="form-field attendance-filter">
-            <span>Activity Filter</span>
-            <select value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}>
-              <option value="All">All activities</option>
-              {activityOptions.map((activity) => (
-                <option key={activity} value={activity}>{activity}</option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field attendance-filter">
-            <span>Attendance Filter</span>
-            <select value={attendanceStatusFilter} onChange={(event) => setAttendanceStatusFilter(event.target.value)}>
-              <option value="All">All attendance</option>
-              <option value="Present">Present only</option>
-              <option value="Absent">Absent only</option>
-            </select>
-          </label>
+        <label className="form-field attendance-filter">
+          <span>Activity Filter</span>
+          <select value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}>
+            <option value="All">All activities</option>
+            {activityOptions.map((activity) => (
+              <option key={activity} value={activity}>{activity}</option>
+            ))}
+          </select>
+        </label>
+        <div className="activity-attendance-grid">
+          {attendanceActivities.map((activity) => {
+            const attendanceState = getAttendanceMarkingState(activity.activityDate, currentRole);
+            const attendanceRate = activity.rows.length === 0 ? 0 : Math.round((activity.present / activity.rows.length) * 100);
+            return (
+              <button type="button" className="activity-attendance-card" key={activity.key} onClick={() => setSelectedAttendanceActivityKey(activity.key)}>
+                <span className="status-pill">{activity.type}</span>
+                <strong>{activity.detail}</strong>
+                <small>{formatDate(activity.activityDate)}</small>
+                <dl className="detail-grid compact-details">
+                  <div><dt>Signups</dt><dd>{activity.rows.length}</dd></div>
+                  <div><dt>Present</dt><dd>{activity.present}/{activity.rows.length} ({attendanceRate}%)</dd></div>
+                  <div><dt>Marking</dt><dd>{attendanceState.label}</dd></div>
+                </dl>
+              </button>
+            );
+          })}
+          {attendanceActivities.length === 0 && (
+            <p className="empty-state">No approved signups match this filter.</p>
+          )}
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Participant</th>
-                <th>Activity</th>
-                <th>Attendance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendanceSlice.items.map((registration) => (
-                <tr key={registration.key}>
-                  <td>{registration.type}</td>
-                  <td>{registration.name}</td>
-                  <td>{registration.detail}</td>
-                  <td>
-                    {(() => {
-                      const attendanceState = getAttendanceMarkingState(registration.activityDate, currentRole);
-                      if (attendanceState.canRequest) {
-                        return (
-                          <button
-                            type="button"
-                            className="secondary-action compact"
-                            title={attendanceState.help}
-                            onClick={() => setRequestTarget({
-                              id: registration.id,
-                              type: registration.type,
-                              name: registration.name,
-                              detail: registration.detail,
-                              currentAttended: registration.attended,
-                            })}
-                          >
-                            {attendanceState.label}
-                          </button>
-                        );
-                      }
-                      return (
-                    <label className="check-row table-check" title={attendanceState.help}>
-                      <input
-                        type="checkbox"
-                        checked={registration.attended}
-                        disabled={!attendanceState.canMark}
-                        onChange={(event) => {
-                          if (registration.type === 'Competition') {
-                            updateCompetitionAttendance(registration.id, event.target.checked);
-                          } else {
-                            updateEventAttendance(registration.id, event.target.checked);
-                          }
-                        }}
-                      />
-                      {attendanceState.label}
-                    </label>
-                      );
-                    })()}
-                  </td>
-                </tr>
-              ))}
-              {attendanceRows.length === 0 && (
-                <tr><td colSpan={4}>No approved signups match this filter.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <PaginationControls page={attendancePage} totalPages={attendanceSlice.totalPages} onPageChange={setAttendancePage} />
       </div>
+      {selectedAttendanceActivity && (
+        <div className="edit-modal-backdrop" role="presentation">
+          <section className="edit-modal attendance-modal" role="dialog" aria-modal="true" aria-label={`${selectedAttendanceActivity.detail} attendance`}>
+            <div className="edit-modal-head">
+              <div>
+                <p className="eyebrow">{selectedAttendanceActivity.type} attendance</p>
+                <h3>{selectedAttendanceActivity.detail}</h3>
+                <small>{formatDate(selectedAttendanceActivity.activityDate)}</small>
+              </div>
+              <button type="button" className="secondary-action compact" onClick={() => setSelectedAttendanceActivityKey(null)}>Close</button>
+            </div>
+            <div className="attendance-bulk-bar">
+              <div>
+                <strong>{selectedAttendanceActivity.present}/{selectedAttendanceActivity.rows.length} present</strong>
+                <small>Mark everyone present first, then untick members who did not attend.</small>
+              </div>
+              <button type="button" className="primary-action compact" onClick={markActivityPresent}>
+                Mark All Present
+              </button>
+            </div>
+            <div className="data-list">
+              {selectedAttendanceActivity.rows.map((registration) => {
+                const attendanceState = getAttendanceMarkingState(registration.activityDate, currentRole);
+                return (
+                  <article key={registration.key} className="data-row">
+                    <span>
+                      <strong>{registration.name}</strong>
+                      <small>{registration.type === 'Competition' ? registration.detail : selectedAttendanceActivity.detail}</small>
+                    </span>
+                    {attendanceState.canRequest ? (
+                      <button
+                        type="button"
+                        className="secondary-action compact"
+                        title={attendanceState.help}
+                        onClick={() => setRequestTarget({
+                          id: registration.id,
+                          type: registration.type,
+                          name: registration.name,
+                          detail: registration.detail,
+                          currentAttended: registration.attended,
+                        })}
+                      >
+                        {attendanceState.label}
+                      </button>
+                    ) : (
+                      <label className="check-row table-check" title={attendanceState.help}>
+                        <input
+                          type="checkbox"
+                          checked={registration.attended}
+                          disabled={!attendanceState.canMark}
+                          onChange={(event) => {
+                            if (registration.type === 'Competition') {
+                              updateCompetitionAttendance(registration.id, event.target.checked);
+                            } else {
+                              updateEventAttendance(registration.id, event.target.checked);
+                            }
+                          }}
+                        />
+                        {registration.attended ? 'Present' : attendanceState.label}
+                      </label>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
       {requestTarget && (
         <div className="dialog-backdrop" role="presentation">
           <div className="confirm-dialog" role="dialog" aria-modal="true">

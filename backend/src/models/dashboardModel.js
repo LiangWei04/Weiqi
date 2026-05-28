@@ -10,12 +10,22 @@ module.exports.selectStats = (callback) => {
       (SELECT COUNT(*)::int FROM users WHERE active = TRUE AND email_verified = FALSE) AS unverified_users,
       (SELECT COUNT(*)::int FROM events) AS total_events,
       (SELECT COUNT(*)::int FROM events WHERE status = 'Open') AS open_events,
+      (SELECT COUNT(*)::int FROM events WHERE status = 'Draft') AS draft_events,
+      (SELECT COUNT(*)::int FROM events WHERE status = 'Cancelled') AS cancelled_events,
+      (SELECT COUNT(*)::int FROM events WHERE pinned = TRUE) AS pinned_events,
+      (SELECT COUNT(*)::int FROM events WHERE event_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS upcoming_events,
+      (SELECT COUNT(*)::int FROM events WHERE event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS archived_events,
+      (SELECT COALESCE(SUM(capacity), 0)::int FROM events WHERE status = 'Open') AS open_event_capacity,
       (SELECT COUNT(*)::int FROM events WHERE requires_approval = TRUE) AS approval_required_events,
       (SELECT COUNT(*)::int FROM event_registrations) AS total_registrations,
       (SELECT COUNT(*)::int FROM event_registrations WHERE status = 'Registered') AS approved_registrations,
       (SELECT COUNT(*)::int FROM event_registrations WHERE status = 'Pending Approval') AS pending_registrations,
       (SELECT COUNT(*)::int FROM event_registrations WHERE status = 'Rejected') AS rejected_registrations,
       (SELECT COUNT(*)::int FROM event_registrations WHERE attended = TRUE) AS total_attended,
+      (SELECT COUNT(*)::int FROM event_comments WHERE deleted_at IS NULL) AS event_comment_count,
+      (SELECT COUNT(*)::int FROM event_reactions) AS event_reaction_count,
+      (SELECT COUNT(*)::int FROM notifications) AS notification_count,
+      (SELECT COUNT(*)::int FROM notifications WHERE read_at IS NULL) AS unread_notification_count,
       (
         SELECT e.title
         FROM events e
@@ -90,13 +100,26 @@ module.exports.selectStats = (callback) => {
       ) AS attendance_by_event,
       (SELECT COUNT(*)::int FROM competitions) AS total_competitions,
       (SELECT COUNT(*)::int FROM competitions WHERE status = 'Open') AS open_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE status = 'Draft') AS draft_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE status = 'In Progress') AS in_progress_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE status = 'Completed') AS completed_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE status = 'Cancelled') AS cancelled_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE COALESCE(end_date, start_date) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS upcoming_competitions,
+      (SELECT COUNT(*)::int FROM competitions WHERE COALESCE(end_date, start_date) < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS archived_competitions,
       (SELECT COUNT(*)::int FROM competition_categories) AS total_categories,
+      (SELECT COALESCE(SUM(capacity), 0)::int FROM competition_categories) AS total_competition_capacity,
       (SELECT COUNT(*)::int FROM competition_registrations) AS total_competition_registrations,
       (SELECT COUNT(*)::int FROM competition_registrations WHERE status = 'Registered') AS approved_competition_registrations,
       (SELECT COUNT(*)::int FROM competition_registrations WHERE status = 'Pending Approval') AS pending_competition_registrations,
       (SELECT COUNT(*)::int FROM competition_registrations WHERE status = 'Waitlisted') AS waitlisted_competition_registrations,
       (SELECT COUNT(*)::int FROM competition_registrations WHERE status = 'Rejected') AS rejected_competition_registrations,
       (SELECT COUNT(*)::int FROM competition_registrations WHERE attended = TRUE) AS attended_competition_registrations,
+      (SELECT COUNT(*)::int FROM competition_rounds) AS total_competition_rounds,
+      (SELECT COUNT(*)::int FROM competition_rounds WHERE status <> 'Completed') AS open_competition_rounds,
+      (SELECT COUNT(*)::int FROM competition_matches) AS total_competition_matches,
+      (SELECT COUNT(*)::int FROM competition_matches WHERE result = 'Scheduled') AS scheduled_competition_matches,
+      (SELECT COUNT(*)::int FROM competition_matches WHERE result <> 'Scheduled') AS completed_competition_matches,
+      (SELECT COUNT(*)::int FROM competition_ranking_records) AS ranking_snapshot_count,
       (
         SELECT COALESCE(json_agg(status_summary ORDER BY status_summary.status), '[]'::json)
         FROM (
@@ -398,6 +421,95 @@ module.exports.selectMemberStats = (data, callback) => {
       (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position <= 5) AS top5_count,
       (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position <= 10) AS top10_count,
       (SELECT MIN(rank_position)::int FROM latest_rankings) AS best_finish,
+      (SELECT COUNT(*)::int FROM events WHERE created_by = $1) AS events_created,
+      (SELECT COUNT(*)::int FROM competitions WHERE organizer_id = $1) AS competitions_organized,
+      (SELECT COUNT(*)::int FROM competition_rounds WHERE generated_by = $1) AS rounds_generated,
+      (SELECT COUNT(*)::int FROM event_comments WHERE user_id = $1 AND deleted_at IS NULL) AS comments_posted,
+      (SELECT COUNT(*)::int FROM event_reactions WHERE user_id = $1) AS reactions_made,
+      (SELECT COUNT(*)::int FROM attendance_change_requests WHERE requested_by = $1) AS attendance_requests_made,
+      (SELECT COUNT(*)::int FROM attendance_change_requests WHERE reviewed_by = $1) AS attendance_requests_reviewed,
+      (
+        SELECT COUNT(*)::int
+        FROM event_registrations er
+        JOIN events e ON e.id = er.event_id
+        WHERE e.created_by = $1
+      ) AS managed_event_signups,
+      (
+        SELECT COUNT(*)::int
+        FROM event_registrations er
+        JOIN events e ON e.id = er.event_id
+        WHERE e.created_by = $1
+          AND er.status = 'Pending Approval'
+      ) AS managed_event_pending,
+      (
+        SELECT COUNT(*)::int
+        FROM event_registrations er
+        JOIN events e ON e.id = er.event_id
+        WHERE e.created_by = $1
+          AND er.attended = TRUE
+      ) AS managed_event_attended,
+      (
+        SELECT COUNT(*)::int
+        FROM competition_registrations cr
+        JOIN competition_categories cc ON cc.id = cr.category_id
+        JOIN competitions c ON c.id = cc.competition_id
+        WHERE c.organizer_id = $1
+      ) AS managed_competition_signups,
+      (
+        SELECT COUNT(*)::int
+        FROM competition_registrations cr
+        JOIN competition_categories cc ON cc.id = cr.category_id
+        JOIN competitions c ON c.id = cc.competition_id
+        WHERE c.organizer_id = $1
+          AND cr.status = 'Pending Approval'
+      ) AS managed_competition_pending,
+      (
+        SELECT COUNT(*)::int
+        FROM competition_registrations cr
+        JOIN competition_categories cc ON cc.id = cr.category_id
+        JOIN competitions c ON c.id = cc.competition_id
+        WHERE c.organizer_id = $1
+          AND cr.attended = TRUE
+      ) AS managed_competition_attended,
+      (
+        SELECT COALESCE(json_agg(contribution_summary ORDER BY contribution_summary.sort_order), '[]'::json)
+        FROM (
+          SELECT 'Events Created' AS name, COUNT(*)::int AS total, 1 AS sort_order FROM events WHERE created_by = $1
+          UNION ALL
+          SELECT 'Competitions Organized', COUNT(*)::int, 2 FROM competitions WHERE organizer_id = $1
+          UNION ALL
+          SELECT 'Rounds Generated', COUNT(*)::int, 3 FROM competition_rounds WHERE generated_by = $1
+          UNION ALL
+          SELECT 'Comments Posted', COUNT(*)::int, 4 FROM event_comments WHERE user_id = $1 AND deleted_at IS NULL
+          UNION ALL
+          SELECT 'Reactions Made', COUNT(*)::int, 5 FROM event_reactions WHERE user_id = $1
+          UNION ALL
+          SELECT 'Attendance Reviews', COUNT(*)::int, 6 FROM attendance_change_requests WHERE reviewed_by = $1
+        ) contribution_summary
+      ) AS exco_contribution_breakdown,
+      (
+        SELECT COALESCE(json_agg(load_summary ORDER BY load_summary.activity_type), '[]'::json)
+        FROM (
+          SELECT
+            'Events' AS activity_type,
+            COUNT(er.id)::int AS total_signups,
+            COUNT(er.id) FILTER (WHERE er.status = 'Pending Approval')::int AS pending,
+            COUNT(er.id) FILTER (WHERE er.attended = TRUE)::int AS attended
+          FROM events e
+          LEFT JOIN event_registrations er ON er.event_id = e.id
+          WHERE e.created_by = $1
+          UNION ALL
+          SELECT
+            'Competitions' AS activity_type,
+            COUNT(cr.id)::int AS total_signups,
+            COUNT(cr.id) FILTER (WHERE cr.status = 'Pending Approval')::int AS pending,
+            COUNT(cr.id) FILTER (WHERE cr.attended = TRUE)::int AS attended
+          FROM competitions c
+          LEFT JOIN competition_categories cc ON cc.competition_id = c.id
+          LEFT JOIN competition_registrations cr ON cr.category_id = cc.id
+          WHERE c.organizer_id = $1
+        ) load_summary
+      ) AS managed_activity_load,
       (
         SELECT COALESCE(json_agg(result_summary ORDER BY result_summary.sort_order), '[]'::json)
         FROM (

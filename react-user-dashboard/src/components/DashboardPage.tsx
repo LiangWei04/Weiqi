@@ -32,9 +32,11 @@ import MyEventsPanel from './events/MyEventsPanel';
 import NotificationMenu from './notifications/NotificationMenu';
 import SettingsPanel from './settings/SettingsPanel';
 import UsersPanel from './users/UsersPanel';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
-const eventManagerRoles = new Set(['Captain', 'Vice-Captain']);
+const eventManagerRoles = new Set(['Captain', 'Secretary']);
 const attendanceManagerRoles = new Set(['Captain', 'Vice-Captain', 'Secretary']);
+const memberManagerRoles = new Set(['Captain', 'Secretary']);
 
 const defaultUserSettings: UserSettings = {
   notifyRegistrationUpdate: true,
@@ -108,6 +110,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
 
   const canCreateEvents = eventManagerRoles.has(role);
   const canManageAttendance = attendanceManagerRoles.has(role);
+  const canManageMembers = memberManagerRoles.has(role);
   const canManageUsers = role === 'Captain';
   const publishedEvents = events
     .filter((eventItem) => eventItem.status !== 'Draft' && !eventItem.is_archived)
@@ -290,7 +293,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
           : notification
       )));
     } catch (error) {
-      showToast(getErrorMessage(error, 'Could not update notification.'));
+      showToast(getApiErrorMessage(error, 'Could not update notification.'));
     }
   };
 
@@ -313,7 +316,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
 
   return (
     <main className="grid min-h-screen grid-cols-1 bg-[radial-gradient(circle_at_84%_0%,rgba(0,229,255,0.1),transparent_26%),#121212] lg:grid-cols-[260px_minmax(0,1fr)]">
-      <Sidebar canManageAttendance={canManageAttendance} canManageUsers={canManageUsers} />
+      <Sidebar canManageAttendance={canManageAttendance} canManageMembers={canManageMembers} canManageUsers={canManageUsers} />
       <section className="min-w-0 p-5 text-white md:p-7">
         <HeaderBar
           eyebrow={pageTitles[view].eyebrow}
@@ -365,6 +368,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
                     eventCount={events.length}
                     totalAttendance={totalAttendance}
                     attendanceRate={attendanceRate}
+                    stats={stats}
                   />
                   {stats && <AnalyticsDashboard stats={stats} />}
                 </>
@@ -382,7 +386,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
             events={publishedEvents}
             archivedEvents={archivedEvents}
             canCreateEvents={canCreateEvents}
-            canModerateComments={canManageAttendance}
+            canModerateComments={canCreateEvents}
             currentUser={currentUser}
             onChanged={(nextMessage) => reloadWithMessage(nextMessage)}
           />
@@ -471,7 +475,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               registrations={registrations}
               eventRegistrations={eventRegistrations}
               attendanceRequests={attendanceRequests}
-              canApprove={canCreateEvents}
+              canApprove={canManageMembers}
               currentRole={role}
               onStatusChanged={(nextMessage) => reloadWithMessage(nextMessage)}
             />
@@ -481,12 +485,12 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         )}
 
         {view === 'members' && (
-          canManageAttendance ? (
+          canManageMembers ? (
             <MemberParticipationPanel
               registrations={registrations}
               eventRegistrations={eventRegistrations}
-              canApprove={canCreateEvents}
-              canDelete={canCreateEvents}
+              canApprove={canManageMembers}
+              canDelete={canManageMembers}
               currentRole={role}
               onChanged={(nextMessage) => reloadWithMessage(nextMessage)}
             />
@@ -550,15 +554,6 @@ const comparePinnedEvents = (left: EventItem, right: EventItem) => {
   }
 
   return new Date(right.created_at || '').getTime() - new Date(left.created_at || '').getTime();
-};
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
-    return response?.data?.message || response?.data?.error || fallback;
-  }
-
-  return fallback;
 };
 
 export default DashboardPage;

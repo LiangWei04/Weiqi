@@ -2,6 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 interface LoginFormInputs {
   identifier: string;
@@ -30,7 +31,7 @@ const LoginPage: React.FC = () => {
       navigate('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
-      setErrorMessage('Login failed. Check your username/email, password, and email verification status.');
+      setErrorMessage(getApiErrorMessage(error, 'Login failed. Check your username/email, password, and email verification status.'));
     }
   };
 

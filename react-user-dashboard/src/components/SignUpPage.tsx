@@ -2,6 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 interface SignUpFormInputs {
   username: string;
@@ -18,7 +19,7 @@ const SignUpPage: React.FC = () => {
 
   const onSubmit = async (data: SignUpFormInputs) => {
     if (data.password !== data.confirmPassword) {
-      alert('Passwords do not match');
+      setMessage('Passwords do not match.');
       return;
     }
 
@@ -32,7 +33,7 @@ const SignUpPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Sign up failed:', error);
-      setMessage('Failed to sign up. Please check the details and try again.');
+      setMessage(getApiErrorMessage(error, 'Failed to sign up. Please check the details and try again.'));
     }
   };
 

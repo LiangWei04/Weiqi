@@ -7,9 +7,9 @@ router.get("/options", jwtMiddleware.verifyToken, competitionController.readOpti
 router.get("/", jwtMiddleware.verifyToken, competitionController.readAll);
 router.post("/", jwtMiddleware.verifyToken, jwtMiddleware.requireEventManager, competitionController.createCompetition);
 router.get("/registrations", jwtMiddleware.verifyToken, jwtMiddleware.requireAttendanceManager, competitionController.readRegistrations);
-router.put("/registrations/:registration_id/status", jwtMiddleware.verifyToken, jwtMiddleware.requireEventManager, competitionController.updateRegistrationStatus);
+router.put("/registrations/:registration_id/status", jwtMiddleware.verifyToken, jwtMiddleware.requireMemberManager, competitionController.updateRegistrationStatus);
 router.put("/registrations/:registration_id/attendance", jwtMiddleware.verifyToken, jwtMiddleware.requireAttendanceManager, competitionController.updateRegistrationAttendance);
-router.delete("/registrations/:registration_id", jwtMiddleware.verifyToken, jwtMiddleware.requireEventManager, competitionController.deleteRegistration);
+router.delete("/registrations/:registration_id", jwtMiddleware.verifyToken, jwtMiddleware.requireMemberManager, competitionController.deleteRegistration);
 router.put("/matches/:match_id/result", jwtMiddleware.verifyToken, jwtMiddleware.requireAttendanceManager, competitionController.updateMatchResult);
 router.get("/:competition_id/tournament", jwtMiddleware.verifyToken, competitionController.readTournament);
 router.post("/:competition_id/categories/:category_id/rounds/generate", jwtMiddleware.verifyToken, jwtMiddleware.requireEventManager, competitionController.generateRound);

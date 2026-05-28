@@ -501,10 +501,11 @@
   position: fixed;
   top: 20px;
   right: 22px;
-  z-index: 50;
+  z-index: 120;
   display: grid;
   gap: 10px;
   max-width: min(420px, calc(100vw - 40px));
+  pointer-events: none;
 }
 
 .toast-message {
@@ -519,6 +520,7 @@
   background: #1e1e1e;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
   animation: toast-in 180ms ease-out;
+  pointer-events: auto;
 }
 
 .toast-message span {
@@ -1160,6 +1162,63 @@
   align-items: end;
 }
 
+.activity-attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.activity-attendance-card {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid #2c2c2e;
+  border-radius: 16px;
+  padding: 18px;
+  background: #181818;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.activity-attendance-card:hover {
+  border-color: #00e5ff;
+  transform: translateY(-1px);
+}
+
+.activity-attendance-card strong {
+  font-size: 1rem;
+}
+
+.activity-attendance-card small {
+  color: #98989d;
+  font-weight: 700;
+}
+
+.attendance-modal {
+  max-width: 920px;
+}
+
+.attendance-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #2c2c2e;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #181818;
+}
+
+.attendance-bulk-bar small {
+  display: block;
+  margin-top: 4px;
+  color: #98989d;
+  font-weight: 700;
+}
+
 .competition-row,
 .category-item,
 .data-row,
@@ -1336,6 +1395,13 @@ th {
 }
 
 .settings-toggle.disabled {
+  opacity: 0.58;
+}
+
+.primary-action.is-disabled,
+.secondary-action.is-disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.35);
   opacity: 0.58;
 }
 

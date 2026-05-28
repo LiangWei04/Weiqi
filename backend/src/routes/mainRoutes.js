@@ -42,6 +42,7 @@ router.get(
 );
 
 router.post("/auth/forgot-password", userController.forgotPassword);
+router.post("/auth/reset-password", userController.resetPassword);
 router.post("/auth/verify-email", userController.verifyEmail);
 router.get("/auth/me", jwtMiddleware.verifyToken, userController.getMe);
 
