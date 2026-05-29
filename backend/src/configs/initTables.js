@@ -209,21 +209,33 @@ module.exports = async function initTables() {
     CREATE TABLE IF NOT EXISTS attendance_change_requests (
       id SERIAL PRIMARY KEY,
       activity_type VARCHAR(20) NOT NULL CHECK (activity_type IN ('Event', 'Competition')),
-      registration_id INTEGER NOT NULL,
+      event_registration_id INTEGER,
+      competition_registration_id INTEGER,
       requested_attended BOOLEAN NOT NULL,
       reason TEXT,
       status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
       requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       reviewed_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT attendance_change_requests_exact_activity_fk CHECK (
+        (activity_type = 'Event' AND event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
+        OR
+        (activity_type = 'Competition' AND event_registration_id IS NULL AND competition_registration_id IS NOT NULL)
+      )
     );
   `);
 
   await db.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_one_pending
-    ON attendance_change_requests (activity_type, registration_id)
-    WHERE status = 'Pending';
+    CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_event_one_pending
+    ON attendance_change_requests (event_registration_id)
+    WHERE status = 'Pending' AND event_registration_id IS NOT NULL;
+  `);
+
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_competition_one_pending
+    ON attendance_change_requests (competition_registration_id)
+    WHERE status = 'Pending' AND competition_registration_id IS NOT NULL;
   `);
 
   await db.query(`
@@ -354,6 +366,26 @@ module.exports = async function initTables() {
     ALTER TABLE competition_registrations
       ADD COLUMN IF NOT EXISTS initial_mms NUMERIC(5, 2) NOT NULL DEFAULT 10;
   `);
+
+  await db.query(`
+    ALTER TABLE attendance_change_requests
+      ADD CONSTRAINT attendance_change_requests_event_registration_fk
+      FOREIGN KEY (event_registration_id) REFERENCES event_registrations(id) ON DELETE CASCADE;
+  `).catch((error) => {
+    if (error.code !== "42710") {
+      throw error;
+    }
+  });
+
+  await db.query(`
+    ALTER TABLE attendance_change_requests
+      ADD CONSTRAINT attendance_change_requests_competition_registration_fk
+      FOREIGN KEY (competition_registration_id) REFERENCES competition_registrations(id) ON DELETE CASCADE;
+  `).catch((error) => {
+    if (error.code !== "42710") {
+      throw error;
+    }
+  });
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS competition_rounds (

@@ -100,8 +100,8 @@ module.exports.requireCaptain = (req, res, next) => {
 };
 
 module.exports.requireEventManager = (req, res, next) => {
-  if (!["Captain", "Secretary"].includes(res.locals.role)) {
-    return res.status(403).json({ error: "Captain or Secretary role required" });
+  if (!["Captain", "Vice-Captain"].includes(res.locals.role)) {
+    return res.status(403).json({ error: "Captain or Vice-Captain role required" });
   }
 
   return next();

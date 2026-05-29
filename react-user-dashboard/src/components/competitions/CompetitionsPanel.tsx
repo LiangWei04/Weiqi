@@ -10,6 +10,7 @@ import FormSelect from '../shared/FormSelect';
 import { EventManagementForm } from '../events/EventsPanel';
 import TournamentOperationsPanel from './TournamentOperationsPanel';
 import { CategoriesPanel, CategoryCapacityEditor, CreateCategoryForm } from './CompetitionCategories';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const DraftsPanel = ({
   eventDrafts,
@@ -471,19 +472,23 @@ const CompetitionManagementForm = ({
 
   const updateCompetition = async (event: React.FormEvent) => {
     event.preventDefault();
-    const response = await apiClient.put<{ message: string; notification?: NotificationResult }>(`/competitions/${competition.id}`, {
-      title: form.title,
-      description: form.description,
-      venueId: toNumberOrNull(form.venueId),
-      startDate: form.startDate,
-      endDate: form.endDate || form.startDate,
-      registrationDeadline: form.registrationDeadline,
-      status: form.status,
-      requiresApproval: form.requiresApproval,
-      allowWaitlist: form.allowWaitlist,
-      reason: form.reason,
-    });
-    await onChanged(`${response.data.message}. ${notificationText(response.data.notification)}`);
+    try {
+      const response = await apiClient.put<{ message: string; notification?: NotificationResult }>(`/competitions/${competition.id}`, {
+        title: form.title,
+        description: form.description,
+        venueId: toNumberOrNull(form.venueId),
+        startDate: form.startDate,
+        endDate: form.endDate || form.startDate,
+        registrationDeadline: form.registrationDeadline,
+        status: form.status,
+        requiresApproval: form.requiresApproval,
+        allowWaitlist: form.allowWaitlist,
+        reason: form.reason,
+      });
+      await onChanged(`${response.data.message}. ${notificationText(response.data.notification)}`);
+    } catch (error) {
+      await onChanged(getApiErrorMessage(error, 'Could not update this competition.'));
+    }
   };
 
   const deleteCompetition = async () => {
@@ -533,7 +538,7 @@ const CompetitionManagementForm = ({
       </label>
       <label className="form-field">
         <span>{isDraft ? 'Reason for updates (not needed for draft delete)' : 'Reason for change or cancellation'}</span>
-        <textarea value={form.reason} required onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+        <textarea value={form.reason} required={!isDraft} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
       </label>
       <div className="row-actions">
         <button type="submit" className="primary-action compact">Update Competition</button>

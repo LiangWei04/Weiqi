@@ -122,18 +122,6 @@ module.exports.createEvent = (req, res) => {
 
 module.exports.updateEventById = (req, res) => {
   const reason = (req.body.reason || "").trim();
-  if (!reason) {
-    return res.status(400).json({ message: "Reason for change is required" });
-  }
-
-  if (req.body.eventDate && isBeforeToday(req.body.eventDate)) {
-    return res.status(400).json({ message: "Event date cannot be in the past" });
-  }
-
-  if (req.body.registrationDeadline && req.body.eventDate && isAfterDate(req.body.registrationDeadline, req.body.eventDate)) {
-    return res.status(400).json({ message: "Registration deadline cannot be after the event date" });
-  }
-
   const data = {
     event_id: req.params.event_id,
     title: req.body.title,
@@ -147,36 +135,68 @@ module.exports.updateEventById = (req, res) => {
     pinned: req.body.pinned === undefined ? undefined : Boolean(req.body.pinned),
   };
 
-  model.selectNotificationRecipients(data, (recipientError, recipientResults) => {
-    if (recipientError) {
-      console.error("Error select event recipients:", recipientError);
-      return res.status(500).json(recipientError);
+  model.selectById(data, (selectError, selectResults) => {
+    if (selectError) {
+      console.error("Error select event before update:", selectError);
+      return res.status(500).json(selectError);
     }
 
-  model.updateById(data, async (error, results) => {
-    if (error) {
-      console.error("Error updateEventById:", error);
-      return res.status(500).json(error);
-    }
-
-    if (results.rows.length === 0) {
+    if (selectResults.rows.length === 0) {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    const notification = await notifyParticipants({
-      recipients: recipientResults.rows,
-      activityType: "Event",
-      activityTitle: results.rows[0].title,
-      action: "Updated",
-      reason,
-    });
+    const existingEvent = selectResults.rows[0];
+    const nextStatus = req.body.status || existingEvent.status;
+    const isDraftOnlyUpdate = existingEvent.status === "Draft" && nextStatus === "Draft";
 
-    return res.status(200).json({
-      event: results.rows[0],
-      message: "Event updated",
-      notification,
+    if (!isDraftOnlyUpdate && !reason) {
+      return res.status(400).json({ message: "Reason for change is required for published events. Draft edits do not need a reason." });
+    }
+
+    const nextEventDate = req.body.eventDate || existingEvent.event_date;
+    const nextRegistrationDeadline = req.body.registrationDeadline || existingEvent.registration_deadline;
+
+    if (req.body.eventDate && isBeforeToday(req.body.eventDate)) {
+      return res.status(400).json({ message: "Event date cannot be in the past" });
+    }
+
+    if (nextRegistrationDeadline && nextEventDate && isAfterDate(nextRegistrationDeadline, nextEventDate)) {
+      return res.status(400).json({ message: "Registration deadline cannot be after the event date" });
+    }
+
+    model.selectNotificationRecipients(data, (recipientError, recipientResults) => {
+      if (recipientError) {
+        console.error("Error select event recipients:", recipientError);
+        return res.status(500).json(recipientError);
+      }
+
+      model.updateById(data, async (error, results) => {
+        if (error) {
+          console.error("Error updateEventById:", error);
+          return res.status(500).json(error);
+        }
+
+        if (results.rows.length === 0) {
+          return res.status(404).json({ message: "Event not found" });
+        }
+
+        const notification = isDraftOnlyUpdate
+          ? { sent: 0, skipped: 0, inApp: 0 }
+          : await notifyParticipants({
+            recipients: recipientResults.rows,
+            activityType: "Event",
+            activityTitle: results.rows[0].title,
+            action: "Updated",
+            reason,
+          });
+
+        return res.status(200).json({
+          event: results.rows[0],
+          message: "Event updated",
+          notification,
+        });
+      });
     });
-  });
   });
 };
 
@@ -373,7 +393,7 @@ module.exports.deleteComment = (req, res) => {
     {
       comment_id: req.params.comment_id,
       deleted_by: res.locals.userId,
-      can_moderate: ["Captain", "Secretary"].includes(res.locals.role),
+      can_moderate: ["Captain", "Vice-Captain"].includes(res.locals.role),
     },
     (error, results) => {
       if (error) {

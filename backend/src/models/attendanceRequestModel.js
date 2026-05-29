@@ -6,7 +6,7 @@ const pendingSelect = `
     SELECT
       acr.id,
       acr.activity_type,
-      acr.registration_id,
+      acr.event_registration_id AS registration_id,
       acr.requested_attended,
       acr.reason,
       acr.status,
@@ -20,7 +20,7 @@ const pendingSelect = `
       NULL::varchar AS category_name,
       er.attended AS current_attended
     FROM attendance_change_requests acr
-    JOIN event_registrations er ON er.id = acr.registration_id AND acr.activity_type = 'Event'
+    JOIN event_registrations er ON er.id = acr.event_registration_id AND acr.activity_type = 'Event'
     JOIN events e ON e.id = er.event_id
     JOIN users member ON member.id = er.user_id
     JOIN users requester ON requester.id = acr.requested_by
@@ -31,7 +31,7 @@ const pendingSelect = `
     SELECT
       acr.id,
       acr.activity_type,
-      acr.registration_id,
+      acr.competition_registration_id AS registration_id,
       acr.requested_attended,
       acr.reason,
       acr.status,
@@ -45,7 +45,7 @@ const pendingSelect = `
       cc.name AS category_name,
       cr.attended AS current_attended
     FROM attendance_change_requests acr
-    JOIN competition_registrations cr ON cr.id = acr.registration_id AND acr.activity_type = 'Competition'
+    JOIN competition_registrations cr ON cr.id = acr.competition_registration_id AND acr.activity_type = 'Competition'
     JOIN competition_categories cc ON cc.id = cr.category_id
     JOIN competitions c ON c.id = cc.competition_id
     JOIN users member ON member.id = cr.user_id
@@ -63,7 +63,7 @@ module.exports.insertEventRequest = (data, callback) => {
   const SQLSTATEMENT = `
     INSERT INTO attendance_change_requests (
       activity_type,
-      registration_id,
+      event_registration_id,
       requested_attended,
       reason,
       requested_by
@@ -74,7 +74,7 @@ module.exports.insertEventRequest = (data, callback) => {
     WHERE er.id = $1
       AND er.status = 'Registered'
       AND (e.event_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
-    ON CONFLICT (activity_type, registration_id) WHERE status = 'Pending' DO UPDATE SET
+    ON CONFLICT (event_registration_id) WHERE status = 'Pending' AND event_registration_id IS NOT NULL DO UPDATE SET
       requested_attended = EXCLUDED.requested_attended,
       reason = EXCLUDED.reason,
       requested_by = EXCLUDED.requested_by,
@@ -88,7 +88,7 @@ module.exports.insertCompetitionRequest = (data, callback) => {
   const SQLSTATEMENT = `
     INSERT INTO attendance_change_requests (
       activity_type,
-      registration_id,
+      competition_registration_id,
       requested_attended,
       reason,
       requested_by
@@ -100,7 +100,7 @@ module.exports.insertCompetitionRequest = (data, callback) => {
     WHERE cr.id = $1
       AND cr.status = 'Registered'
       AND (c.start_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
-    ON CONFLICT (activity_type, registration_id) WHERE status = 'Pending' DO UPDATE SET
+    ON CONFLICT (competition_registration_id) WHERE status = 'Pending' AND competition_registration_id IS NOT NULL DO UPDATE SET
       requested_attended = EXCLUDED.requested_attended,
       reason = EXCLUDED.reason,
       requested_by = EXCLUDED.requested_by,
@@ -136,12 +136,12 @@ module.exports.approve = async (data) => {
     if (request.activity_type === "Event") {
       await client.query(
         "UPDATE event_registrations SET attended = $1 WHERE id = $2;",
-        [request.requested_attended, request.registration_id]
+        [request.requested_attended, request.event_registration_id]
       );
     } else {
       await client.query(
         "UPDATE competition_registrations SET attended = $1 WHERE id = $2;",
-        [request.requested_attended, request.registration_id]
+        [request.requested_attended, request.competition_registration_id]
       );
     }
 

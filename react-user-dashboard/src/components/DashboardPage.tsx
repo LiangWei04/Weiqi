@@ -34,7 +34,7 @@ import SettingsPanel from './settings/SettingsPanel';
 import UsersPanel from './users/UsersPanel';
 import { getApiErrorMessage } from '../utils/apiErrors';
 
-const eventManagerRoles = new Set(['Captain', 'Secretary']);
+const eventManagerRoles = new Set(['Captain', 'Vice-Captain']);
 const attendanceManagerRoles = new Set(['Captain', 'Vice-Captain', 'Secretary']);
 const memberManagerRoles = new Set(['Captain', 'Secretary']);
 

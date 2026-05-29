@@ -172,19 +172,6 @@ module.exports.createCompetition = (req, res) => {
 
 module.exports.updateCompetitionById = (req, res) => {
   const reason = (req.body.reason || "").trim();
-  if (!reason) {
-    return res.status(400).json({ message: "Reason for change is required" });
-  }
-
-  const dateError = validateCompetitionDates({
-    startDate: req.body.startDate,
-    endDate: req.body.endDate || req.body.startDate,
-    registrationDeadline: req.body.registrationDeadline,
-  });
-  if (dateError) {
-    return res.status(400).json({ message: dateError });
-  }
-
   const data = {
     competition_id: req.params.competition_id,
     title: req.body.title,
@@ -198,34 +185,71 @@ module.exports.updateCompetitionById = (req, res) => {
     allow_waitlist: req.body.allowWaitlist === undefined ? undefined : Boolean(req.body.allowWaitlist),
   };
 
-  model.selectNotificationRecipients(data, (recipientError, recipientResults) => {
-    if (recipientError) {
-      console.error("Error select competition recipients:", recipientError);
-      return res.status(500).json(recipientError);
+  model.selectById({ ...data, user_id: res.locals.userId }, (selectError, selectResults) => {
+    if (selectError) {
+      console.error("Error select competition before update:", selectError);
+      return res.status(500).json(selectError);
     }
 
-    model.updateCompetition(data, async (error, results) => {
-      if (error) {
-        console.error("Error updateCompetitionById:", error);
-        return res.status(500).json(error);
+    if (selectResults.rows.length === 0) {
+      return res.status(404).json({ message: "Competition not found" });
+    }
+
+    const existingCompetition = selectResults.rows[0];
+    const nextStatus = req.body.status || existingCompetition.status;
+    const isDraftOnlyUpdate = existingCompetition.status === "Draft" && nextStatus === "Draft";
+
+    if (!isDraftOnlyUpdate && !reason) {
+      return res.status(400).json({ message: "Reason for change is required for published competitions. Draft edits do not need a reason." });
+    }
+
+    const nextStartDate = req.body.startDate || existingCompetition.start_date;
+    const nextEndDate = req.body.endDate || existingCompetition.end_date || nextStartDate;
+    const nextRegistrationDeadline = req.body.registrationDeadline || existingCompetition.registration_deadline;
+
+    if (req.body.startDate && isBeforeToday(nextStartDate)) {
+      return res.status(400).json({ message: "Competition start date cannot be in the past" });
+    }
+
+    if (nextEndDate && new Date(nextEndDate) < new Date(nextStartDate)) {
+      return res.status(400).json({ message: "Competition end date cannot be before the start date" });
+    }
+
+    if (nextRegistrationDeadline && new Date(nextRegistrationDeadline) > new Date(nextStartDate)) {
+      return res.status(400).json({ message: "Registration deadline cannot be after the start date" });
+    }
+
+    model.selectNotificationRecipients(data, (recipientError, recipientResults) => {
+      if (recipientError) {
+        console.error("Error select competition recipients:", recipientError);
+        return res.status(500).json(recipientError);
       }
 
-      if (results.rows.length === 0) {
-        return res.status(404).json({ message: "Competition not found" });
-      }
+      model.updateCompetition(data, async (error, results) => {
+        if (error) {
+          console.error("Error updateCompetitionById:", error);
+          return res.status(500).json(error);
+        }
 
-      const notification = await notifyParticipants({
-        recipients: recipientResults.rows,
-        activityType: "Competition",
-        activityTitle: results.rows[0].title,
-        action: "Updated",
-        reason,
-      });
+        if (results.rows.length === 0) {
+          return res.status(404).json({ message: "Competition not found" });
+        }
 
-      return res.status(200).json({
-        message: "Competition updated",
-        competition: results.rows[0],
-        notification,
+        const notification = isDraftOnlyUpdate
+          ? { sent: 0, skipped: 0, inApp: 0 }
+          : await notifyParticipants({
+            recipients: recipientResults.rows,
+            activityType: "Competition",
+            activityTitle: results.rows[0].title,
+            action: "Updated",
+            reason,
+          });
+
+        return res.status(200).json({
+          message: "Competition updated",
+          competition: results.rows[0],
+          notification,
+        });
       });
     });
   });

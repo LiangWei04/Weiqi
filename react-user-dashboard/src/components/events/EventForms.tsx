@@ -5,6 +5,7 @@ import type { EventItem, NotificationResult, UserSettings } from '../../types/da
 import ConfirmDeleteDialog from '../shared/ConfirmDeleteDialog';
 import DatePickerField from '../shared/DatePickerField';
 import FormInput from '../shared/FormInput';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const EventManagementForm = ({
   eventItem,
@@ -31,18 +32,22 @@ const EventManagementForm = ({
 
   const updateEvent = async (event: React.FormEvent) => {
     event.preventDefault();
-    const response = await apiClient.put<{ message: string; notification?: NotificationResult }>(`/events/${eventItem.id}`, {
-      title: form.title,
-      description: form.description,
-      eventDate: form.eventDate,
-      registrationDeadline: form.registrationDeadline,
-      venue: form.venue,
-      capacity: Number(form.capacity),
-      status: form.status,
-      requiresApproval: form.requiresApproval,
-      reason: form.reason,
-    });
-    await onChanged(`${response.data.message}. ${notificationText(response.data.notification)}`);
+    try {
+      const response = await apiClient.put<{ message: string; notification?: NotificationResult }>(`/events/${eventItem.id}`, {
+        title: form.title,
+        description: form.description,
+        eventDate: form.eventDate,
+        registrationDeadline: form.registrationDeadline,
+        venue: form.venue,
+        capacity: Number(form.capacity),
+        status: form.status,
+        requiresApproval: form.requiresApproval,
+        reason: form.reason,
+      });
+      await onChanged(`${response.data.message}. ${notificationText(response.data.notification)}`);
+    } catch (error) {
+      await onChanged(getApiErrorMessage(error, 'Could not update this event.'));
+    }
   };
 
   const deleteEvent = async () => {
@@ -85,7 +90,7 @@ const EventManagementForm = ({
       </label>
       <label className="form-field">
         <span>{isDraft ? 'Reason for updates (not needed for draft delete)' : 'Reason for change or cancellation'}</span>
-        <textarea value={form.reason} required onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+        <textarea value={form.reason} required={!isDraft} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
       </label>
       <div className="row-actions">
         {onCancel && <button type="button" className="secondary-action compact" onClick={onCancel}>Cancel</button>}
