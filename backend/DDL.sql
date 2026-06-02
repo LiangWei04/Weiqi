@@ -22,19 +22,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique
 ON users (username)
 WHERE username IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS roles (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(40) UNIQUE NOT NULL,
-  description TEXT
-);
-
-CREATE TABLE IF NOT EXISTS user_roles (
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, role_id)
-);
-
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   notify_registration_update BOOLEAN NOT NULL DEFAULT TRUE,
@@ -70,7 +57,7 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   event_date DATE NOT NULL,
   registration_deadline DATE,
-  venue VARCHAR(160) NOT NULL,
+  venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL,
   capacity INTEGER NOT NULL CHECK (capacity > 0),
   status VARCHAR(30) NOT NULL DEFAULT 'Draft'
     CHECK (status IN ('Draft', 'Open', 'Completed', 'Cancelled')),
@@ -121,7 +108,6 @@ CREATE TABLE IF NOT EXISTS scoring_systems (
   id SERIAL PRIMARY KEY,
   name VARCHAR(80) UNIQUE NOT NULL,
   win_points INTEGER NOT NULL DEFAULT 1,
-  draw_points INTEGER NOT NULL DEFAULT 0,
   loss_points INTEGER NOT NULL DEFAULT 0,
   description TEXT
 );
@@ -156,6 +142,7 @@ CREATE TABLE IF NOT EXISTS competition_categories (
   registration_fee NUMERIC(8, 2) NOT NULL DEFAULT 0 CHECK (registration_fee >= 0),
   min_age INTEGER CHECK (min_age IS NULL OR min_age >= 0),
   max_age INTEGER CHECK (max_age IS NULL OR max_age >= 0),
+  rank_type VARCHAR(20) CHECK (rank_type IS NULL OR rank_type IN ('Kyu', 'Dan', 'Unrated')),
   min_rank_value INTEGER CHECK (min_rank_value IS NULL OR min_rank_value >= 0),
   max_rank_value INTEGER CHECK (max_rank_value IS NULL OR max_rank_value >= 0),
   UNIQUE (competition_id, name)
@@ -187,21 +174,20 @@ CREATE TABLE IF NOT EXISTS competition_registrations (
 
 CREATE TABLE IF NOT EXISTS attendance_change_requests (
   id SERIAL PRIMARY KEY,
-  activity_type VARCHAR(20) NOT NULL CHECK (activity_type IN ('Event', 'Competition')),
   event_registration_id INTEGER REFERENCES event_registrations(id) ON DELETE CASCADE,
   competition_registration_id INTEGER REFERENCES competition_registrations(id) ON DELETE CASCADE,
   requested_attended BOOLEAN NOT NULL,
-  reason TEXT,
+  reason TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'Pending'
     CHECK (status IN ('Pending', 'Approved', 'Rejected')),
   requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT attendance_change_requests_exact_activity_fk CHECK (
-    (activity_type = 'Event' AND event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
+  CONSTRAINT attendance_change_requests_exact_registration CHECK (
+    (event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
     OR
-    (activity_type = 'Competition' AND event_registration_id IS NULL AND competition_registration_id IS NOT NULL)
+    (event_registration_id IS NULL AND competition_registration_id IS NOT NULL)
   )
 );
 
@@ -219,10 +205,13 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(180) NOT NULL,
   message TEXT NOT NULL,
   type VARCHAR(40) NOT NULL DEFAULT 'Activity',
-  activity_type VARCHAR(40),
-  activity_id INTEGER,
+  event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+  competition_id INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
   read_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT notifications_single_activity CHECK (
+    event_id IS NULL OR competition_id IS NULL
+  )
 );
 
 CREATE TABLE IF NOT EXISTS competition_rounds (
@@ -247,7 +236,7 @@ CREATE TABLE IF NOT EXISTS competition_matches (
   white_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   handicap INTEGER NOT NULL DEFAULT 0 CHECK (handicap >= 0),
   result VARCHAR(30) NOT NULL DEFAULT 'Scheduled'
-    CHECK (result IN ('Scheduled', 'Black Win', 'White Win', 'Draw', 'Bye', 'Forfeit Black', 'Forfeit White')),
+    CHECK (result IN ('Scheduled', 'Black Win', 'White Win', 'Bye', 'Forfeit Black', 'Forfeit White')),
   winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   completed_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -265,13 +254,7 @@ CREATE TABLE IF NOT EXISTS competition_ranking_records (
   sosos NUMERIC(6, 2) NOT NULL DEFAULT 0,
   wins INTEGER NOT NULL DEFAULT 0,
   losses INTEGER NOT NULL DEFAULT 0,
-  draws INTEGER NOT NULL DEFAULT 0,
+  byes INTEGER NOT NULL DEFAULT 0,
   recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (competition_id, category_id, user_id, round_number)
 );
-
-DROP TABLE IF EXISTS registration_form_answers;
-DROP TABLE IF EXISTS registration_form_fields;
-DROP TABLE IF EXISTS match_players;
-DROP TABLE IF EXISTS matches;
-DROP TABLE IF EXISTS rankings;
