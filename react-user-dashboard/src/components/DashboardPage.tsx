@@ -388,6 +388,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
             canCreateEvents={canCreateEvents}
             canModerateComments={canCreateEvents}
             currentUser={currentUser}
+            options={options}
             onChanged={(nextMessage) => reloadWithMessage(nextMessage)}
           />
         )}
@@ -400,6 +401,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
           canCreateEvents ? (
             <CreateEventPage
               settings={userSettings}
+              options={options}
               onCreated={async (nextMessage) => {
                 await loadData(role);
                 showToast(nextMessage);

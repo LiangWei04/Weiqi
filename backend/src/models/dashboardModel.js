@@ -274,12 +274,13 @@ module.exports.selectMemberStats = (data, callback) => {
         e.title,
         NULL::text AS detail,
         e.event_date::timestamp AS activity_date,
-        e.venue::text AS venue,
+        v.name::text AS venue,
         r.status,
         r.attended,
         r.created_at
       FROM event_registrations r
       JOIN events e ON e.id = r.event_id
+      LEFT JOIN venues v ON v.id = e.venue_id
       WHERE r.user_id = $1
 
       UNION ALL
@@ -343,7 +344,7 @@ module.exports.selectMemberStats = (data, callback) => {
         rr.sosos,
         rr.wins,
         rr.losses,
-        rr.draws,
+        rr.byes,
         rr.recorded_at
       FROM competition_ranking_records rr
       JOIN competitions c ON c.id = rr.competition_id

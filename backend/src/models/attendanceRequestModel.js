@@ -5,7 +5,7 @@ const pendingSelect = `
   FROM (
     SELECT
       acr.id,
-      acr.activity_type,
+      'Event' AS activity_type,
       acr.event_registration_id AS registration_id,
       acr.requested_attended,
       acr.reason,
@@ -20,7 +20,7 @@ const pendingSelect = `
       NULL::varchar AS category_name,
       er.attended AS current_attended
     FROM attendance_change_requests acr
-    JOIN event_registrations er ON er.id = acr.event_registration_id AND acr.activity_type = 'Event'
+    JOIN event_registrations er ON er.id = acr.event_registration_id
     JOIN events e ON e.id = er.event_id
     JOIN users member ON member.id = er.user_id
     JOIN users requester ON requester.id = acr.requested_by
@@ -30,7 +30,7 @@ const pendingSelect = `
 
     SELECT
       acr.id,
-      acr.activity_type,
+      'Competition' AS activity_type,
       acr.competition_registration_id AS registration_id,
       acr.requested_attended,
       acr.reason,
@@ -45,7 +45,7 @@ const pendingSelect = `
       cc.name AS category_name,
       cr.attended AS current_attended
     FROM attendance_change_requests acr
-    JOIN competition_registrations cr ON cr.id = acr.competition_registration_id AND acr.activity_type = 'Competition'
+    JOIN competition_registrations cr ON cr.id = acr.competition_registration_id
     JOIN competition_categories cc ON cc.id = cr.category_id
     JOIN competitions c ON c.id = cc.competition_id
     JOIN users member ON member.id = cr.user_id
@@ -62,13 +62,12 @@ module.exports.selectPending = (callback) => {
 module.exports.insertEventRequest = (data, callback) => {
   const SQLSTATEMENT = `
     INSERT INTO attendance_change_requests (
-      activity_type,
       event_registration_id,
       requested_attended,
       reason,
       requested_by
     )
-    SELECT 'Event', er.id, $2, $3, $4
+    SELECT er.id, $2, $3, $4
     FROM event_registrations er
     JOIN events e ON e.id = er.event_id
     WHERE er.id = $1
@@ -87,13 +86,12 @@ module.exports.insertEventRequest = (data, callback) => {
 module.exports.insertCompetitionRequest = (data, callback) => {
   const SQLSTATEMENT = `
     INSERT INTO attendance_change_requests (
-      activity_type,
       competition_registration_id,
       requested_attended,
       reason,
       requested_by
     )
-    SELECT 'Competition', cr.id, $2, $3, $4
+    SELECT cr.id, $2, $3, $4
     FROM competition_registrations cr
     JOIN competition_categories cc ON cc.id = cr.category_id
     JOIN competitions c ON c.id = cc.competition_id
@@ -133,7 +131,7 @@ module.exports.approve = async (data) => {
     }
 
     const request = requestResult.rows[0];
-    if (request.activity_type === "Event") {
+    if (request.event_registration_id) {
       await client.query(
         "UPDATE event_registrations SET attended = $1 WHERE id = $2;",
         [request.requested_attended, request.event_registration_id]

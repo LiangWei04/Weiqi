@@ -67,15 +67,6 @@ const insertDemoMembers = async () => {
     insertedUsers.push(result.rows[0]);
   }
 
-  await db.query(`
-    INSERT INTO user_roles (user_id, role_id)
-    SELECT u.id, r.id
-    FROM users u
-    JOIN roles r ON r.name = u.role
-    WHERE u.email LIKE 'demo.member%@example.com'
-    ON CONFLICT DO NOTHING;
-  `);
-
   return insertedUsers;
 };
 

@@ -83,7 +83,7 @@ module.exports.readAll = async (req, res) => {
 };
 
 module.exports.createEvent = (req, res) => {
-  const requiredFields = ["title", "eventDate", "venue", "capacity"];
+  const requiredFields = ["title", "eventDate", "venueId", "capacity"];
   for (const field of requiredFields) {
     if (req.body[field] === undefined || req.body[field] === "") {
       return res.status(400).json({ message: `${field} is undefined or empty` });
@@ -103,7 +103,7 @@ module.exports.createEvent = (req, res) => {
     description: req.body.description || "",
     eventDate: req.body.eventDate,
     registrationDeadline: req.body.registrationDeadline || req.body.eventDate,
-    venue: req.body.venue,
+    venue_id: req.body.venueId,
     capacity: req.body.capacity,
     status: "Draft",
     requiresApproval: Boolean(req.body.requiresApproval),
@@ -128,7 +128,7 @@ module.exports.updateEventById = (req, res) => {
     description: req.body.description,
     eventDate: req.body.eventDate,
     registrationDeadline: req.body.registrationDeadline,
-    venue: req.body.venue,
+    venue_id: req.body.venueId,
     capacity: req.body.capacity,
     status: req.body.status,
     requiresApproval: req.body.requiresApproval === undefined ? undefined : Boolean(req.body.requiresApproval),

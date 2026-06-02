@@ -99,6 +99,7 @@ const DraftsPanel = ({
         <EditModal title={`Edit ${editingEvent.title}`} onClose={() => setEditingEvent(null)}>
           <EventManagementForm
             eventItem={editingEvent}
+            options={options}
             onCancel={() => setEditingEvent(null)}
             onChanged={async (nextMessage) => {
               setEditingEvent(null);

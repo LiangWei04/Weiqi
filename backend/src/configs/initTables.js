@@ -6,10 +6,11 @@ module.exports = async function initTables() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       name VARCHAR(120) NOT NULL DEFAULT 'CCA Member',
-      username VARCHAR(80) UNIQUE,
+      username VARCHAR(80),
       email VARCHAR(255) UNIQUE NOT NULL,
       password_hash VARCHAR(255),
-      role VARCHAR(30) NOT NULL DEFAULT 'Member',
+      role VARCHAR(30) NOT NULL DEFAULT 'Member'
+        CHECK (role IN ('Captain', 'Vice-Captain', 'Secretary', 'Member')),
       active BOOLEAN NOT NULL DEFAULT TRUE,
       status VARCHAR(40) NOT NULL DEFAULT 'Pending Verification',
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -82,21 +83,78 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
+    DROP TABLE IF EXISTS user_roles;
+    DROP TABLE IF EXISTS roles;
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS venues (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(160) UNIQUE NOT NULL,
+      address TEXT,
+      capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
       title VARCHAR(160) NOT NULL,
       description TEXT,
       event_date DATE NOT NULL,
       registration_deadline DATE,
-      venue VARCHAR(160) NOT NULL,
+      venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL,
       capacity INTEGER NOT NULL CHECK (capacity > 0),
-      status VARCHAR(30) NOT NULL DEFAULT 'Draft',
+      status VARCHAR(30) NOT NULL DEFAULT 'Draft'
+        CHECK (status IN ('Draft', 'Open', 'Completed', 'Cancelled')),
       requires_approval BOOLEAN NOT NULL DEFAULT FALSE,
       pinned BOOLEAN NOT NULL DEFAULT FALSE,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await db.query(`
+    ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL;
+  `);
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'events' AND column_name = 'venue'
+      ) THEN
+        ALTER TABLE events ALTER COLUMN venue DROP NOT NULL;
+      END IF;
+    END $$;
+  `);
+
+  await db.query(`
+    INSERT INTO venues (name)
+    SELECT DISTINCT venue
+    FROM events
+    WHERE venue IS NOT NULL
+    ON CONFLICT (name) DO NOTHING;
+  `).catch((error) => {
+    if (error.code !== "42703") {
+      throw error;
+    }
+  });
+
+  await db.query(`
+    UPDATE events
+    SET venue_id = venues.id
+    FROM venues
+    WHERE events.venue_id IS NULL
+      AND events.venue = venues.name;
+  `).catch((error) => {
+    if (error.code !== "42703") {
+      throw error;
+    }
+  });
 
   await db.query(`
     ALTER TABLE events
@@ -129,7 +187,8 @@ module.exports = async function initTables() {
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-      status VARCHAR(30) NOT NULL DEFAULT 'Registered',
+      status VARCHAR(30) NOT NULL DEFAULT 'Registered'
+        CHECK (status IN ('Pending Approval', 'Registered', 'Rejected', 'Withdrawn')),
       attended BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (user_id, event_id)
@@ -161,23 +220,6 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
-    CREATE TABLE IF NOT EXISTS roles (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(40) UNIQUE NOT NULL,
-      description TEXT
-    );
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS user_roles (
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-      assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (user_id, role_id)
-    );
-  `);
-
-  await db.query(`
     CREATE TABLE IF NOT EXISTS user_settings (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       notify_registration_update BOOLEAN NOT NULL DEFAULT TRUE,
@@ -198,30 +240,48 @@ module.exports = async function initTables() {
       title VARCHAR(180) NOT NULL,
       message TEXT NOT NULL,
       type VARCHAR(40) NOT NULL DEFAULT 'Activity',
-      activity_type VARCHAR(40),
-      activity_id INTEGER,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      competition_id INTEGER,
       read_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT notifications_single_activity CHECK (
+        event_id IS NULL OR competition_id IS NULL
+      )
     );
   `);
 
   await db.query(`
+    ALTER TABLE notifications
+      ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      ADD COLUMN IF NOT EXISTS competition_id INTEGER;
+  `);
+
+  await db.query(`
+    ALTER TABLE notifications
+      ADD CONSTRAINT notifications_single_activity
+      CHECK (event_id IS NULL OR competition_id IS NULL);
+  `).catch((error) => {
+    if (error.code !== "42710") {
+      throw error;
+    }
+  });
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS attendance_change_requests (
       id SERIAL PRIMARY KEY,
-      activity_type VARCHAR(20) NOT NULL CHECK (activity_type IN ('Event', 'Competition')),
       event_registration_id INTEGER,
       competition_registration_id INTEGER,
       requested_attended BOOLEAN NOT NULL,
-      reason TEXT,
+      reason TEXT NOT NULL,
       status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
       requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       reviewed_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT attendance_change_requests_exact_activity_fk CHECK (
-        (activity_type = 'Event' AND event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
+      CONSTRAINT attendance_change_requests_exact_registration CHECK (
+        (event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
         OR
-        (activity_type = 'Competition' AND event_registration_id IS NULL AND competition_registration_id IS NOT NULL)
+        (event_registration_id IS NULL AND competition_registration_id IS NOT NULL)
       )
     );
   `);
@@ -236,6 +296,30 @@ module.exports = async function initTables() {
     CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_competition_one_pending
     ON attendance_change_requests (competition_registration_id)
     WHERE status = 'Pending' AND competition_registration_id IS NOT NULL;
+  `);
+
+  await db.query(`
+    ALTER TABLE attendance_change_requests
+      DROP CONSTRAINT IF EXISTS attendance_change_requests_exact_activity_fk;
+  `);
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'attendance_change_requests' AND column_name = 'activity_type'
+      ) THEN
+        ALTER TABLE attendance_change_requests ALTER COLUMN activity_type DROP NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'attendance_change_requests' AND column_name = 'registration_id'
+      ) THEN
+        ALTER TABLE attendance_change_requests ALTER COLUMN registration_id DROP NOT NULL;
+      END IF;
+    END $$;
   `);
 
   await db.query(`
@@ -261,7 +345,6 @@ module.exports = async function initTables() {
       id SERIAL PRIMARY KEY,
       name VARCHAR(80) UNIQUE NOT NULL,
       win_points INTEGER NOT NULL DEFAULT 1,
-      draw_points INTEGER NOT NULL DEFAULT 0,
       loss_points INTEGER NOT NULL DEFAULT 0,
       description TEXT
     );
@@ -324,6 +407,7 @@ module.exports = async function initTables() {
       registration_fee NUMERIC(8, 2) NOT NULL DEFAULT 0 CHECK (registration_fee >= 0),
       min_age INTEGER CHECK (min_age IS NULL OR min_age >= 0),
       max_age INTEGER CHECK (max_age IS NULL OR max_age >= 0),
+      rank_type VARCHAR(20) CHECK (rank_type IS NULL OR rank_type IN ('Kyu', 'Dan', 'Unrated')),
       min_rank_value INTEGER CHECK (min_rank_value IS NULL OR min_rank_value >= 0),
       max_rank_value INTEGER CHECK (max_rank_value IS NULL OR max_rank_value >= 0),
       UNIQUE (competition_id, name)
@@ -412,12 +496,28 @@ module.exports = async function initTables() {
       white_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       handicap INTEGER NOT NULL DEFAULT 0 CHECK (handicap >= 0),
       result VARCHAR(30) NOT NULL DEFAULT 'Scheduled'
-        CHECK (result IN ('Scheduled', 'Black Win', 'White Win', 'Draw', 'Bye', 'Forfeit Black', 'Forfeit White')),
+        CHECK (result IN ('Scheduled', 'Black Win', 'White Win', 'Bye', 'Forfeit Black', 'Forfeit White')),
       winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       completed_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await db.query(`
+    ALTER TABLE competition_categories
+      ADD COLUMN IF NOT EXISTS rank_type VARCHAR(20)
+      CHECK (rank_type IS NULL OR rank_type IN ('Kyu', 'Dan', 'Unrated'));
+  `);
+
+  await db.query(`
+    ALTER TABLE notifications
+      ADD CONSTRAINT notifications_competition_fk
+      FOREIGN KEY (competition_id) REFERENCES competitions(id) ON DELETE CASCADE;
+  `).catch((error) => {
+    if (error.code !== "42710") {
+      throw error;
+    }
+  });
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS competition_ranking_records (
@@ -432,10 +532,15 @@ module.exports = async function initTables() {
       sosos NUMERIC(6, 2) NOT NULL DEFAULT 0,
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
-      draws INTEGER NOT NULL DEFAULT 0,
+      byes INTEGER NOT NULL DEFAULT 0,
       recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (competition_id, category_id, user_id, round_number)
     );
+  `);
+
+  await db.query(`
+    ALTER TABLE competition_ranking_records
+      ADD COLUMN IF NOT EXISTS byes INTEGER NOT NULL DEFAULT 0;
   `);
 
   await db.query(`
@@ -467,24 +572,6 @@ module.exports = async function initTables() {
   );
 
   await db.query(`
-    INSERT INTO roles (name, description)
-    VALUES
-      ('Captain', 'Full tournament and user administration'),
-      ('Vice-Captain', 'Attendance marking operations'),
-      ('Secretary', 'Event, competition, registration and member operations'),
-      ('Member', 'Participant access')
-    ON CONFLICT (name) DO NOTHING;
-  `);
-
-  await db.query(`
-    INSERT INTO user_roles (user_id, role_id)
-    SELECT u.id, r.id
-    FROM users u
-    JOIN roles r ON r.name = u.role
-    ON CONFLICT DO NOTHING;
-  `);
-
-  await db.query(`
     INSERT INTO venues (name, address, capacity)
     VALUES
       ('SWA Training Hall', 'Singapore Weiqi Association', 64),
@@ -503,10 +590,10 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
-    INSERT INTO scoring_systems (name, win_points, draw_points, loss_points, description)
+    INSERT INTO scoring_systems (name, win_points, loss_points, description)
     VALUES
-      ('Standard Win/Loss', 1, 0, 0, 'One point for a win, zero for a loss.'),
-      ('League Points', 3, 1, 0, 'Three points for a win, one point for a draw.')
+      ('Standard Win/Loss', 1, 0, 'One point for a win, zero for a loss.'),
+      ('League Points', 3, 0, 'Three points for a win, zero for a loss.')
     ON CONFLICT (name) DO NOTHING;
   `);
 
@@ -613,12 +700,14 @@ module.exports = async function initTables() {
   `);
 
   await db.query(`
-    INSERT INTO events (title, description, event_date, registration_deadline, venue, capacity, status)
-    SELECT * FROM (VALUES
+    INSERT INTO events (title, description, event_date, registration_deadline, venue_id, capacity, status)
+    SELECT seed.title, seed.description, seed.event_date, seed.registration_deadline, venues.id, seed.capacity, seed.status
+    FROM (VALUES
       ('Weekly Weiqi Training', 'Regular practice session for all skill levels.', '2026-05-15'::date, '2026-05-13'::date, 'CCA Room 2', 24, 'Open'),
       ('Beginner Strategy Clinic', 'Small-group clinic for new members.', '2026-05-18'::date, '2026-05-16'::date, 'Library Hub', 16, 'Open'),
-      ('Friendly Match Day', 'Casual internal games and review.', '2026-05-23'::date, '2026-05-21'::date, 'Hall B', 32, 'Open')
-    ) AS seed(title, description, event_date, registration_deadline, venue, capacity, status)
+      ('Friendly Match Day', 'Casual internal games and review.', '2026-05-23'::date, '2026-05-21'::date, 'SWA Training Hall', 32, 'Open')
+    ) AS seed(title, description, event_date, registration_deadline, venue_name, capacity, status)
+    JOIN venues ON venues.name = seed.venue_name
     WHERE NOT EXISTS (SELECT 1 FROM events);
   `);
 };

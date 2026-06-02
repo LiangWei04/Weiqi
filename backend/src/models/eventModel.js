@@ -2,7 +2,19 @@ const pool = require("../services/db");
 
 module.exports.selectAll = (data, callback) => {
   const SQLSTATEMENT = `
-    SELECT e.id, e.title, e.description, e.event_date, e.registration_deadline, e.venue, e.capacity, e.status, e.requires_approval, e.pinned, e.created_at,
+    SELECT
+      e.id,
+      e.title,
+      e.description,
+      e.event_date,
+      e.registration_deadline,
+      e.venue_id,
+      v.name AS venue,
+      e.capacity,
+      e.status,
+      e.requires_approval,
+      e.pinned,
+      e.created_at,
       ((e.event_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date) AS is_archived,
       COUNT(r.id) FILTER (WHERE r.status = 'Registered')::int AS registered,
       COUNT(r.id) FILTER (WHERE r.status = 'Pending Approval')::int AS pending_requests,
@@ -32,8 +44,9 @@ module.exports.selectAll = (data, callback) => {
           AND deleted_at IS NULL
       ) AS comment_count
     FROM events e
+    LEFT JOIN venues v ON v.id = e.venue_id
     LEFT JOIN event_registrations r ON r.event_id = e.id
-    GROUP BY e.id
+    GROUP BY e.id, v.name
     ORDER BY e.pinned DESC, e.event_date DESC, e.created_at DESC, e.id DESC;
   `;
   pool.query(SQLSTATEMENT, [data.user_id], callback);
@@ -41,16 +54,16 @@ module.exports.selectAll = (data, callback) => {
 
 module.exports.insertSingle = (data, callback) => {
   const SQLSTATEMENT = `
-    INSERT INTO events (title, description, event_date, registration_deadline, venue, capacity, status, requires_approval, created_by)
+    INSERT INTO events (title, description, event_date, registration_deadline, venue_id, capacity, status, requires_approval, created_by)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING *;
+    RETURNING events.*, (SELECT name FROM venues WHERE id = events.venue_id) AS venue;
   `;
-  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue, data.capacity, data.status, data.requiresApproval, data.createdBy];
+  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue_id, data.capacity, data.status, data.requiresApproval, data.createdBy];
   pool.query(SQLSTATEMENT, VALUES, callback);
 };
 
 module.exports.selectById = (data, callback) => {
-  pool.query("SELECT * FROM events WHERE id = $1;", [data.event_id], callback);
+  pool.query("SELECT events.*, venues.name AS venue FROM events LEFT JOIN venues ON venues.id = events.venue_id WHERE events.id = $1;", [data.event_id], callback);
 };
 
 module.exports.updateById = (data, callback) => {
@@ -60,15 +73,15 @@ module.exports.updateById = (data, callback) => {
         description = COALESCE($2, description),
         event_date = COALESCE($3, event_date),
         registration_deadline = COALESCE($4, registration_deadline),
-        venue = COALESCE($5, venue),
+        venue_id = COALESCE($5, venue_id),
         capacity = COALESCE($6, capacity),
         status = COALESCE($7, status),
         requires_approval = COALESCE($8, requires_approval),
         pinned = COALESCE($9, pinned)
     WHERE id = $10
-    RETURNING *;
+    RETURNING events.*, (SELECT name FROM venues WHERE id = events.venue_id) AS venue;
   `;
-  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue, data.capacity, data.status, data.requiresApproval, data.pinned, data.event_id];
+  const VALUES = [data.title, data.description, data.eventDate, data.registrationDeadline, data.venue_id, data.capacity, data.status, data.requiresApproval, data.pinned, data.event_id];
   pool.query(SQLSTATEMENT, VALUES, callback);
 };
 

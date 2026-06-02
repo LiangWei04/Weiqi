@@ -1,27 +1,31 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
-import type { EventItem, NotificationResult, UserSettings } from '../../types/dashboard';
+import type { EventItem, NotificationResult, OptionsResponse, UserSettings } from '../../types/dashboard';
 import ConfirmDeleteDialog from '../shared/ConfirmDeleteDialog';
 import DatePickerField from '../shared/DatePickerField';
 import FormInput from '../shared/FormInput';
+import FormSelect from '../shared/FormSelect';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const EventManagementForm = ({
   eventItem,
+  options,
   onChanged,
   onCancel,
 }: {
   eventItem: EventItem;
+  options: OptionsResponse;
   onChanged: (message: string) => void | Promise<void>;
   onCancel?: () => void;
 }) => {
+  const currentVenue = options.venues.find((venue) => venue.name === eventItem.venue);
   const [form, setForm] = React.useState({
     title: eventItem.title,
     description: eventItem.description || '',
     eventDate: toDateInput(eventItem.event_date),
     registrationDeadline: toDateInput(eventItem.registration_deadline || ''),
-    venue: eventItem.venue,
+    venueId: currentVenue ? String(currentVenue.id) : '',
     capacity: String(eventItem.capacity),
     status: eventItem.status,
     requiresApproval: eventItem.requires_approval,
@@ -38,7 +42,7 @@ const EventManagementForm = ({
         description: form.description,
         eventDate: form.eventDate,
         registrationDeadline: form.registrationDeadline,
-        venue: form.venue,
+        venueId: toNumberOrNull(form.venueId),
         capacity: Number(form.capacity),
         status: form.status,
         requiresApproval: form.requiresApproval,
@@ -68,7 +72,7 @@ const EventManagementForm = ({
         <FormInput label="Title" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
         <DatePickerField label="Date" value={form.eventDate} onChange={(eventDate) => setForm({ ...form, eventDate })} required />
         <DatePickerField label="Registration Deadline" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} required />
-        <FormInput label="Venue" value={form.venue} onChange={(venue) => setForm({ ...form, venue })} required />
+        <FormSelect label="Venue" value={form.venueId} options={options.venues} onChange={(venueId) => setForm({ ...form, venueId })} required />
         <FormInput label="Capacity" type="number" value={form.capacity} onChange={(capacity) => setForm({ ...form, capacity })} required />
       </div>
       <label className="form-field">
@@ -76,7 +80,7 @@ const EventManagementForm = ({
         <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
           <option value="Draft">Draft</option>
           <option value="Open">Open</option>
-          <option value="Closed">Closed</option>
+          <option value="Completed">Completed</option>
           <option value="Cancelled">Cancelled</option>
         </select>
       </label>
@@ -112,9 +116,11 @@ const EventManagementForm = ({
 
 const CreateEventPage = ({
   settings,
+  options,
   onCreated,
 }: {
   settings: UserSettings;
+  options: OptionsResponse;
   onCreated: (message: string) => void | Promise<void>;
 }) => (
   <section className="panel create-event-panel">
@@ -128,23 +134,26 @@ const CreateEventPage = ({
     <p className="panel-intro">
       Add CCA activities such as training sessions, clinics, friendly match days or meetings. New events are saved as drafts until you publish them.
     </p>
-    <CreateEventForm settings={settings} onCreated={onCreated} />
+    <CreateEventForm settings={settings} options={options} onCreated={onCreated} />
   </section>
 );
 
 const CreateEventForm = ({
   settings,
+  options,
   onCreated,
 }: {
   settings: UserSettings;
+  options: OptionsResponse;
   onCreated: (message: string) => void | Promise<void>;
 }) => {
+  const defaultVenue = options.venues.find((venue) => venue.name === settings.defaultCompetitionVenue);
   const [form, setForm] = React.useState({
     title: '',
     description: '',
     eventDate: '',
     registrationDeadline: '',
-    venue: settings.defaultCompetitionVenue,
+    venueId: defaultVenue ? String(defaultVenue.id) : '',
     capacity: String(settings.defaultEventCapacity),
     requiresApproval: settings.defaultRequiresApproval,
   });
@@ -156,7 +165,7 @@ const CreateEventForm = ({
       description: form.description,
       eventDate: form.eventDate,
       registrationDeadline: form.registrationDeadline || form.eventDate,
-      venue: form.venue,
+      venueId: toNumberOrNull(form.venueId),
       capacity: Number(form.capacity),
       requiresApproval: form.requiresApproval,
       status: 'Draft',
@@ -171,7 +180,7 @@ const CreateEventForm = ({
         <FormInput label="Title" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
         <DatePickerField label="Date" value={form.eventDate} onChange={(eventDate) => setForm({ ...form, eventDate })} required />
         <DatePickerField label="Registration Deadline" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} required />
-        <FormInput label="Venue" value={form.venue} onChange={(venue) => setForm({ ...form, venue })} required />
+        <FormSelect label="Venue" value={form.venueId} options={options.venues} onChange={(venueId) => setForm({ ...form, venueId })} required />
         <FormInput label="Capacity" type="number" value={form.capacity} onChange={(capacity) => setForm({ ...form, capacity })} required />
       </div>
       <label className="check-row">
@@ -215,5 +224,7 @@ const toDateInput = (dateValue: string) => {
 
   return new Date(dateValue).toISOString().slice(0, 10);
 };
+
+const toNumberOrNull = (value: string) => (value ? Number(value) : null);
 
 export { CreateEventPage, EventManagementForm };

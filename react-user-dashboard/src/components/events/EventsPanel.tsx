@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
-import type { CurrentUser, EventComment, EventItem, NotificationResult } from '../../types/dashboard';
+import type { CurrentUser, EventComment, EventItem, NotificationResult, OptionsResponse } from '../../types/dashboard';
 import { formatDate, formatDateTime } from '../../utils/formatters';
 import EditModal from '../shared/EditModal';
 import { getApiErrorMessage } from '../../utils/apiErrors';
@@ -20,6 +20,7 @@ const EventsPanel = ({
   canCreateEvents,
   canModerateComments,
   currentUser,
+  options,
   onChanged,
 }: {
   events: EventItem[];
@@ -27,6 +28,7 @@ const EventsPanel = ({
   canCreateEvents: boolean;
   canModerateComments: boolean;
   currentUser: CurrentUser | null;
+  options: OptionsResponse;
   onChanged: (message: string) => void;
 }) => {
   const [editingEvent, setEditingEvent] = React.useState<EventItem | null>(null);
@@ -250,6 +252,7 @@ const EventsPanel = ({
         <EditModal title={`Edit ${editingEvent.title}`} onClose={() => setEditingEvent(null)}>
           <EventManagementForm
             eventItem={editingEvent}
+            options={options}
             onCancel={() => setEditingEvent(null)}
             onChanged={async (nextMessage) => {
               setEditingEvent(null);

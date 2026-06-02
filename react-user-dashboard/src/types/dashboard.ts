@@ -73,7 +73,7 @@ export interface EventItem {
   description: string;
   event_date: string;
   registration_deadline: string | null;
-  venue: string;
+  venue: string | null;
   capacity: number;
   status: string;
   requires_approval: boolean;
@@ -451,7 +451,7 @@ export interface TournamentStanding {
   sosos: number;
   wins: number;
   losses: number;
-  draws: number;
+  byes: number;
   rank_position: number;
   rounds: Record<string, string>;
 }

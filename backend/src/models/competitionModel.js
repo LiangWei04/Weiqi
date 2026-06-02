@@ -491,10 +491,6 @@ const resultPoints = (match, userId) => {
     return Number(match.white_user_id) === Number(userId) ? 1 : 0;
   }
 
-  if (match.result === "Draw") {
-    return 0.5;
-  }
-
   if (match.result === "Forfeit Black") {
     return Number(match.white_user_id) === Number(userId) ? 1 : 0;
   }
@@ -507,20 +503,20 @@ const resultPoints = (match, userId) => {
 };
 
 const resultRecord = (match, userId) => {
-  if (match.result === "Draw") {
-    return { wins: 0, losses: 0, draws: 1 };
+  if (match.result === "Bye" && Number(match.black_user_id) === Number(userId)) {
+    return { wins: 1, losses: 0, byes: 1 };
   }
 
   const points = resultPoints(match, userId);
   if (points === 1) {
-    return { wins: 1, losses: 0, draws: 0 };
+    return { wins: 1, losses: 0, byes: 0 };
   }
 
   if (["Black Win", "White Win", "Forfeit Black", "Forfeit White"].includes(match.result)) {
-    return { wins: 0, losses: 1, draws: 0 };
+    return { wins: 0, losses: 1, byes: 0 };
   }
 
-  return { wins: 0, losses: 0, draws: 0 };
+  return { wins: 0, losses: 0, byes: 0 };
 };
 
 const roundText = (match, userId, standingMap) => {
@@ -536,9 +532,7 @@ const roundText = (match, userId, standingMap) => {
   const opponentNumber = standingMap.get(Number(opponentId))?.player_number || opponentId;
 
   let symbol = "";
-  if (match.result === "Draw") {
-    symbol = "=";
-  } else if (
+  if (
     (isBlack && ["Black Win", "Forfeit White"].includes(match.result)) ||
     (!isBlack && ["White Win", "Forfeit Black"].includes(match.result))
   ) {
@@ -570,7 +564,7 @@ const buildStandings = (participants, matches) => {
       sosos: 0,
       wins: 0,
       losses: 0,
-      draws: 0,
+      byes: 0,
       rounds: {},
       opponents: [],
     });
@@ -589,7 +583,7 @@ const buildStandings = (participants, matches) => {
       standing.mms += points;
       standing.wins += record.wins;
       standing.losses += record.losses;
-      standing.draws += record.draws;
+      standing.byes += record.byes;
       standing.rounds[`R${match.round_number}`] = roundText(match, userId, standingMap);
 
       const opponentId = Number(match.black_user_id) === Number(userId)
@@ -909,7 +903,7 @@ module.exports.recordRankingSnapshot = async (data) => {
           sosos,
           wins,
           losses,
-          draws
+          byes
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (competition_id, category_id, user_id, round_number)
@@ -920,7 +914,7 @@ module.exports.recordRankingSnapshot = async (data) => {
           sosos = EXCLUDED.sosos,
           wins = EXCLUDED.wins,
           losses = EXCLUDED.losses,
-          draws = EXCLUDED.draws,
+          byes = EXCLUDED.byes,
           recorded_at = CURRENT_TIMESTAMP;
       `,
       [
@@ -934,7 +928,7 @@ module.exports.recordRankingSnapshot = async (data) => {
         standing.sosos,
         standing.wins,
         standing.losses,
-        standing.draws,
+        standing.byes,
       ]
     );
   }

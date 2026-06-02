@@ -5,17 +5,31 @@ module.exports.insertMany = async ({ userIds, title, message, type = "Activity",
     return { rowCount: 0 };
   }
 
+  const eventId = activityType === "Event" ? activityId : null;
+  const competitionId = activityType === "Competition" ? activityId : null;
   const SQLSTATEMENT = `
-    INSERT INTO notifications (user_id, title, message, type, activity_type, activity_id)
+    INSERT INTO notifications (user_id, title, message, type, event_id, competition_id)
     SELECT UNNEST($1::int[]), $2, $3, $4, $5, $6
     RETURNING *;
   `;
-  return pool.query(SQLSTATEMENT, [userIds, title, message, type, activityType, activityId]);
+  return pool.query(SQLSTATEMENT, [userIds, title, message, type, eventId, competitionId]);
 };
 
 module.exports.selectForUser = (data, callback) => {
   const SQLSTATEMENT = `
-    SELECT id, title, message, type, activity_type, activity_id, read_at, created_at
+    SELECT
+      id,
+      title,
+      message,
+      type,
+      CASE
+        WHEN event_id IS NOT NULL THEN 'Event'
+        WHEN competition_id IS NOT NULL THEN 'Competition'
+        ELSE NULL
+      END AS activity_type,
+      COALESCE(event_id, competition_id) AS activity_id,
+      read_at,
+      created_at
     FROM notifications
     WHERE user_id = $1
     ORDER BY created_at DESC
@@ -79,12 +93,13 @@ module.exports.selectMyUpcomingActivities = (data, callback) => {
         e.title,
         e.description,
         e.event_date AS activity_date,
-        e.venue,
+        v.name AS venue,
         r.status,
         r.attended,
         NULL::varchar AS category_name
       FROM event_registrations r
       JOIN events e ON e.id = r.event_id
+      LEFT JOIN venues v ON v.id = e.venue_id
       WHERE r.user_id = $1
         AND r.status IN ('Registered', 'Pending Approval')
         AND e.event_date >= CURRENT_DATE
