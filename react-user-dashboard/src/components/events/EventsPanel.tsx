@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
@@ -142,7 +143,7 @@ const EventsPanel = ({
         : ownStatus || (activeSignups >= eventItem.capacity ? 'Full' : 'Register');
 
     return (
-      <article className={eventItem.is_archived ? 'event-card archived-card' : 'event-card'} key={eventItem.id}>
+      <article className={eventItem.is_archived ? 'event-card archived-card' : 'event-card'} key={eventItem.id} data-demo-highlight={demoMode && eventItem.title === 'Beginner Workshop' ? 'true' : undefined}>
         <div>
           <div className='flex flex-wrap gap-2'>
               <span className={eventItem.is_archived ? 'status-pill warning' : 'status-pill'}>{eventItem.is_archived ? 'Archived' : eventItem.status}</span>
@@ -160,7 +161,7 @@ const EventsPanel = ({
             <div><dt>Attendance</dt><dd>{eventItem.attended}/{eventItem.registered} ({attendanceRate}%)</dd></div>
           )}
         </dl>
-        <div className="event-social-row">
+        {!demoMode && <div className="event-social-row">
           {eventReactionOptions.map((reaction) => (
             <button
               key={reaction.type}
@@ -177,11 +178,11 @@ const EventsPanel = ({
             <span>{'\u{1F4AC}'}</span>
             <strong>{eventItem.comment_count || 0}</strong>
           </button>
-        </div>
+        </div>}
         <div className="event-actions">
-          <button type="button" className="secondary-action compact" disabled={!canRegister} onClick={() => registerForEvent(eventItem)}>
+          {(!demoMode || (currentUser?.role === 'Member' && eventItem.title === 'Beginner Workshop')) && <button type="button" className="secondary-action compact" disabled={!canRegister} onClick={() => registerForEvent(eventItem)}>
             {registerLabel}
-          </button>
+          </button>}
           {canCreateEvents && (
             <>
               <button type="button" className="secondary-action compact" onClick={() => togglePinned(eventItem)}>
@@ -230,7 +231,7 @@ const EventsPanel = ({
         {events.map(renderEventCard)}
         {events.length === 0 && <p className="empty-state">No current or upcoming events. Passed events are archived automatically.</p>}
       </div>
-      {canCreateEvents && archivedEvents.length > 0 && (
+      {(canCreateEvents || demoMode) && archivedEvents.length > 0 && (
         <div className="panel-section">
           <div className="panel-heading">
             <div>

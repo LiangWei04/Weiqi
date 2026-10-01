@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
@@ -342,7 +343,7 @@ const MemberParticipationPanel = ({
                         <input
                           type="checkbox"
                           checked={item.attended}
-                          disabled={!attendanceState.canMark}
+                          disabled={demoMode || !attendanceState.canMark}
                           onChange={(event) => {
                             if (item.type === 'Competition') {
                               updateCompetitionAttendance(item.id, event.target.checked);

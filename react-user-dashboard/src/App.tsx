@@ -1,3 +1,4 @@
+import { demoMode } from './utils/demo';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
@@ -12,10 +13,10 @@ function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignUpPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+      <Route path="/signup" element={demoMode ? <Navigate to="/login" replace /> : <SignUpPage />} />
+      <Route path="/forgot-password" element={demoMode ? <Navigate to="/login" replace /> : <ForgotPasswordPage />} />
+      <Route path="/verify-email" element={demoMode ? <Navigate to="/login" replace /> : <VerifyEmailPage />} />
+      <Route path="/oauth-callback" element={demoMode ? <Navigate to="/login" replace /> : <OAuthCallbackPage />} />
       <Route path="/dashboard" element={<DashboardPage view="analytics" />} />
       <Route path="/events" element={<DashboardPage view="events" />} />
       <Route path="/my-events" element={<DashboardPage view="my-events" />} />

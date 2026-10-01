@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 const apiClient = axios.create({
   baseURL: '/api',
@@ -6,6 +6,9 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+const demoMode = import.meta.env.VITE_PUBLIC_DEMO === 'true';
+const authStorage = demoMode ? sessionStorage : localStorage;
 
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
@@ -16,15 +19,15 @@ const onRefreshed = (token: string) => {
 };
 
 const refreshAccessToken = async (): Promise<string> => {
-  const token = localStorage.getItem('authToken');
+  const token = authStorage.getItem('authToken');
   if (!token) {
     throw new Error('No token available');
   }
   return token;
 };
 
-apiClient.interceptors.request.use((config: any) => {
-  const token = localStorage.getItem('authToken');
+apiClient.interceptors.request.use((config) => {
+  const token = authStorage.getItem('authToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -32,9 +35,20 @@ apiClient.interceptors.request.use((config: any) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: any) => {
-    const originalRequest = error.config;
+  (response) => {
+    if (demoMode && ['post','put','delete'].includes(response.config.method || '') && !response.config.url?.startsWith('/demo/')) window.dispatchEvent(new Event('demo-updated'));
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    if (!originalRequest) return Promise.reject(error);
+    if (demoMode) {
+      if (error.response?.status === 401 && !(originalRequest?.url === '/demo/session' && originalRequest?.method === 'post')) {
+        authStorage.removeItem('authToken');
+        window.location.assign('/login?expired=1');
+      }
+      return Promise.reject(error);
+    }
 
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
@@ -57,8 +71,8 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('refreshToken');
+        authStorage.removeItem('authToken');
+        authStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }

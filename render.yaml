@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: tourneyhub-demo
+    runtime: node
+    plan: free
+    region: singapore
+    autoDeployTrigger: off
+    buildCommand: npm ci --prefix backend --omit=dev && npm ci --prefix react-user-dashboard --include=dev && npm run build --prefix react-user-dashboard && npm run demo:setup --prefix backend
+    startCommand: npm start --prefix backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: DEMO_MODE
+        value: "true"
+      - key: VITE_PUBLIC_DEMO
+        value: "true"
+      - key: DEMO_DATABASE_NAME
+        value: tourney_demo
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DB_CONNECTION_LIMIT
+        value: "5"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true

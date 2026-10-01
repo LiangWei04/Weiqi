@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 
-const hasEmailConfig = () => Boolean(
+const hasEmailConfig = () => process.env.DEMO_MODE !== "true" && Boolean(
   process.env.EMAIL_HOST &&
   process.env.EMAIL_PORT &&
   process.env.EMAIL_USER &&

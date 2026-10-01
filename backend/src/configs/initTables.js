@@ -1,5 +1,7 @@
 const bcrypt = require("bcrypt");
 const db = require("../services/db");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
 
 module.exports = async function initTables() {
   await db.query(`
@@ -302,6 +304,8 @@ module.exports = async function initTables() {
     ALTER TABLE attendance_change_requests
       DROP CONSTRAINT IF EXISTS attendance_change_requests_exact_activity_fk;
   `);
+
+  await db.query(readFileSync(path.join(__dirname, "attendanceRequestAudit.sql"), "utf8"));
 
   await db.query(`
     DO $$

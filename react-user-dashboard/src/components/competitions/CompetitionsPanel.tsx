@@ -1,3 +1,4 @@
+import { demoMode, authStorage } from '../../utils/demo';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
@@ -197,7 +198,7 @@ const CompetitionsPanel = ({
         {competitions.map(renderCompetitionCard)}
         {competitions.length === 0 && <p className="empty-state">{emptyMessage}</p>}
       </div>
-      {canCreateEvents && archivedCompetitions.length > 0 && (
+      {(canCreateEvents || demoMode) && archivedCompetitions.length > 0 && (
         <div className="panel-section">
           <div className="panel-heading">
             <div>
@@ -412,7 +413,7 @@ const CompetitionDetailPanel = ({
               competitionTitle={competition.title}
               tournament={tournament}
               loading={tournamentLoading}
-              canManage={canCreateEvents}
+              canManage={canCreateEvents || (demoMode && authStorage.getItem('role') === 'Captain' && competition.status === 'In Progress')}
               onClose={() => setTournamentOpen(false)}
               onChanged={async (nextMessage) => {
                 await loadTournament();

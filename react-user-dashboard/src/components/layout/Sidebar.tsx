@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
@@ -24,7 +25,7 @@ const Sidebar = ({ canManageAttendance, canManageMembers, canManageUsers }: Side
       {canManageMembers && <SideNavLink to="/members">Members</SideNavLink>}
       {canManageUsers && <SideNavLink to="/users">Users</SideNavLink>}
     </nav>
-    <NavLink
+    {!demoMode && <NavLink
       to="/settings"
       className={({ isActive }) => [
         'mt-auto grid h-12 w-12 place-items-center rounded-2xl border border-app-border bg-app-surface text-2xl text-white no-underline transition hover:border-app-cyan hover:bg-app-cyan/10 hover:text-app-cyan hover:no-underline',
@@ -34,7 +35,7 @@ const Sidebar = ({ canManageAttendance, canManageMembers, canManageUsers }: Side
       title="Settings"
     >
       <span aria-hidden="true">{'\u2699'}</span>
-    </NavLink>
+    </NavLink>}
   </aside>
 );
 

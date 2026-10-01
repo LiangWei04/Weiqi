@@ -85,6 +85,9 @@ module.exports.readAll = async (req, res) => {
 module.exports.createEvent = (req, res) => {
   const requiredFields = ["title", "eventDate", "venueId", "capacity"];
   for (const field of requiredFields) {
+    if (req.body["capacity"] <= 0){
+      return res.status(400).json({message: ""})
+    }
     if (req.body[field] === undefined || req.body[field] === "") {
       return res.status(400).json({ message: `${field} is undefined or empty` });
     }

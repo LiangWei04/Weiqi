@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import apiClient from '../../utils/apiClient';
 import type { Category } from '../../types/dashboard';
@@ -158,9 +159,9 @@ const CategoriesPanel = ({
                   {category.current_user_registration_status && !category.registration_closed ? ` - ${category.current_user_registration_status}` : ''}
                 </small>
               </div>
-              <button type="button" className="secondary-action compact" disabled={Boolean(existingCompetitionRegistration) || category.registration_closed} onClick={() => registerForCategory(category)}>
+              {!demoMode && <button type="button" className="secondary-action compact" disabled={Boolean(existingCompetitionRegistration) || category.registration_closed} onClick={() => registerForCategory(category)}>
                 {registerLabel}
-              </button>
+              </button>}
             </article>
           );
         })}

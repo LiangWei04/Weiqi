@@ -1,6 +1,28 @@
 const model = require("../models/attendanceRequestModel");
 const notificationModel = require("../models/notificationModel");
 
+const correctionInput = (req, res) => {
+  if (typeof req.body?.attended !== "boolean" ||
+      typeof req.body?.reason !== "string" || !req.body.reason.trim()) {
+    res.status(400).json({ code: "INVALID_CORRECTION", message: "Attendance must be a boolean and a non-empty reason is required." });
+    return null;
+  }
+  return { requested_attended: req.body.attended, reason: req.body.reason.trim(), requested_by: res.locals.userId };
+};
+
+const handleError = (res, error) => {
+  if (error.code === "23505") {
+    return res.status(409).json({ code: "PENDING_REQUEST_EXISTS", message: "A pending correction already exists. Refresh and use Replace on that request." });
+  }
+  console.error("Attendance request operation failed:", error.code || error.name);
+  return res.status(500).json({ code: "ATTENDANCE_REQUEST_FAILED", message: "The attendance request could not be processed." });
+};
+
+const unavailable = (res) => res.status(409).json({
+  code: "REQUEST_NOT_PENDING",
+  message: "This request has already been reviewed, replaced, or is no longer available. Refresh to review the latest request. To make a further correction after a decision, explicitly create a new request.",
+});
+
 const notifyCaptains = async ({ title, message }) => {
   try {
     const result = await new Promise((resolve, reject) => {
@@ -27,8 +49,7 @@ const notifyCaptains = async ({ title, message }) => {
 module.exports.readPending = (req, res) => {
   model.selectPending((error, results) => {
     if (error) {
-      console.error("Error read attendance requests:", error);
-      return res.status(500).json(error);
+      return handleError(res, error);
     }
 
     return res.status(200).json(results.rows);
@@ -36,21 +57,16 @@ module.exports.readPending = (req, res) => {
 };
 
 module.exports.createEventRequest = (req, res) => {
+  const input = correctionInput(req, res);
+  if (!input) return;
   const data = {
     registration_id: req.params.registration_id,
-    requested_attended: Boolean(req.body.attended),
-    reason: (req.body.reason || "").trim(),
-    requested_by: res.locals.userId,
+    ...input,
   };
-
-  if (!data.reason) {
-    return res.status(400).json({ message: "Reason is required when requesting a past attendance change" });
-  }
 
   model.insertEventRequest(data, async (error, results) => {
     if (error) {
-      console.error("Error create event attendance request:", error);
-      return res.status(500).json(error);
+      return handleError(res, error);
     }
 
     if (results.rows.length === 0) {
@@ -70,21 +86,16 @@ module.exports.createEventRequest = (req, res) => {
 };
 
 module.exports.createCompetitionRequest = (req, res) => {
+  const input = correctionInput(req, res);
+  if (!input) return;
   const data = {
     registration_id: req.params.registration_id,
-    requested_attended: Boolean(req.body.attended),
-    reason: (req.body.reason || "").trim(),
-    requested_by: res.locals.userId,
+    ...input,
   };
-
-  if (!data.reason) {
-    return res.status(400).json({ message: "Reason is required when requesting a past attendance change" });
-  }
 
   model.insertCompetitionRequest(data, async (error, results) => {
     if (error) {
-      console.error("Error create competition attendance request:", error);
-      return res.status(500).json(error);
+      return handleError(res, error);
     }
 
     if (results.rows.length === 0) {
@@ -103,6 +114,19 @@ module.exports.createCompetitionRequest = (req, res) => {
   });
 };
 
+module.exports.replace = async (req, res) => {
+  const input = correctionInput(req, res);
+  if (!input) return;
+  try {
+    const request = await model.replace({ ...input, request_id: req.params.request_id });
+    if (!request) return unavailable(res);
+    await notifyCaptains({ title: "Attendance request replaced", message: "A revised attendance correction is waiting for Captain approval." });
+    return res.status(201).json({ message: "Replacement request sent to Captain", request });
+  } catch (error) {
+    return handleError(res, error);
+  }
+};
+
 module.exports.approve = async (req, res) => {
   try {
     const request = await model.approve({
@@ -111,13 +135,12 @@ module.exports.approve = async (req, res) => {
     });
 
     if (!request) {
-      return res.status(404).json({ message: "Pending attendance request not found" });
+      return unavailable(res);
     }
 
     return res.status(200).json({ message: "Attendance request approved", request });
   } catch (error) {
-    console.error("Error approve attendance request:", error);
-    return res.status(500).json(error);
+    return handleError(res, error);
   }
 };
 
@@ -129,12 +152,11 @@ module.exports.reject = (req, res) => {
     },
     (error, results) => {
       if (error) {
-        console.error("Error reject attendance request:", error);
-        return res.status(500).json(error);
+        return handleError(res, error);
       }
 
       if (results.rows.length === 0) {
-        return res.status(404).json({ message: "Pending attendance request not found" });
+        return unavailable(res);
       }
 
       return res.status(200).json({ message: "Attendance request rejected", request: results.rows[0] });

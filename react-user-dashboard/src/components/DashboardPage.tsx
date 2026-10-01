@@ -1,4 +1,6 @@
 import React from 'react';
+import { authStorage, demoMode } from '../utils/demo';
+import DemoGuide from './demo/DemoGuide';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import type {
@@ -63,7 +65,7 @@ const pageTitles: Record<DashboardView, { eyebrow: string; title: string }> = {
 
 const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' }) => {
   const navigate = useNavigate();
-  const [role, setRole] = React.useState(localStorage.getItem('role') || 'Member');
+  const [role, setRole] = React.useState(authStorage.getItem('role') || 'Member');
   const [currentUser, setCurrentUser] = React.useState<CurrentUser | null>(null);
   const [competitions, setCompetitions] = React.useState<Competition[]>([]);
   const [selectedCompetition, setSelectedCompetition] = React.useState<CompetitionDetail | null>(null);
@@ -108,10 +110,10 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
   }, []);
 
-  const canCreateEvents = eventManagerRoles.has(role);
+  const canCreateEvents = !demoMode && eventManagerRoles.has(role);
   const canManageAttendance = attendanceManagerRoles.has(role);
   const canManageMembers = memberManagerRoles.has(role);
-  const canManageUsers = role === 'Captain';
+  const canManageUsers = !demoMode && role === 'Captain';
   const publishedEvents = events
     .filter((eventItem) => eventItem.status !== 'Draft' && !eventItem.is_archived)
     .sort(comparePinnedEvents);
@@ -189,7 +191,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         setEventRegistrations([]);
       }
 
-      if (activeRole === 'Captain') {
+      if (!demoMode && activeRole === 'Captain') {
         try {
           const userResponse = await apiClient.get<{ users: ManagedUser[] }>('/users?limit=100');
           setUsers(userResponse.data.users);
@@ -198,6 +200,11 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
           setUsers([]);
         }
 
+      } else {
+        setUsers([]);
+      }
+
+      if (['Captain', 'Vice-Captain', 'Secretary'].includes(activeRole)) {
         try {
           const attendanceRequestResponse = await apiClient.get<AttendanceChangeRequest[]>('/attendance-requests');
           setAttendanceRequests(attendanceRequestResponse.data);
@@ -206,7 +213,6 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
           setAttendanceRequests([]);
         }
       } else {
-        setUsers([]);
         setAttendanceRequests([]);
       }
 
@@ -218,7 +224,10 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         const detailResponse = await apiClient.get<CompetitionDetail>(`/competitions/${selectedCompetitionId}`);
         setSelectedCompetition(detailResponse.data);
       } else {
-        setSelectedCompetition(null);
+        const demoCompetitionId = demoMode ? Number(new URLSearchParams(window.location.search).get('competition')) : 0;
+        if (demoCompetitionId && nextVisibleCompetitions.some((item) => item.id === demoCompetitionId)) {
+          setSelectedCompetition((await apiClient.get<CompetitionDetail>(`/competitions/${demoCompetitionId}`)).data);
+        } else setSelectedCompetition(null);
       }
 
       const draftDetailId = selectedDraftCompetition?.status === 'Draft'
@@ -239,7 +248,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   }, [role, selectedCompetition?.id, selectedCompetition?.status, selectedDraftCompetition?.id, selectedDraftCompetition?.status, showToast]);
 
   React.useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const token = authStorage.getItem('authToken');
     if (!token) {
       navigate('/login', { replace: true });
       return;
@@ -249,8 +258,8 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
       .then((response) => {
         setCurrentUser(response.data);
         setRole(response.data.role);
-        localStorage.setItem('role', response.data.role);
-        localStorage.setItem('userId', String(response.data.id));
+        authStorage.setItem('role', response.data.role);
+        authStorage.setItem('userId', String(response.data.id));
         return loadData(response.data.role);
       })
       .catch((error) => {
@@ -298,9 +307,9 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   };
 
   const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('role');
+    authStorage.removeItem('authToken');
+    authStorage.removeItem('userId');
+    authStorage.removeItem('role');
     navigate('/login', { replace: true });
   };
 
@@ -318,6 +327,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
     <main className="grid min-h-screen grid-cols-1 bg-[radial-gradient(circle_at_84%_0%,rgba(0,229,255,0.1),transparent_26%),#121212] lg:grid-cols-[260px_minmax(0,1fr)]">
       <Sidebar canManageAttendance={canManageAttendance} canManageMembers={canManageMembers} canManageUsers={canManageUsers} />
       <section className="min-w-0 p-5 text-white md:p-7">
+        {demoMode && <DemoGuide />}
         <HeaderBar
           eyebrow={pageTitles[view].eyebrow}
           title={pageTitles[view].title}
@@ -327,7 +337,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
             <>
             <NotificationMenu
               notifications={notifications}
-              canAnnounce={canManageAttendance}
+              canAnnounce={!demoMode && canManageAttendance}
               events={events}
               competitions={competitions}
               onRead={markNotificationRead}
@@ -361,7 +371,8 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               </div>
               {dashboardTab === 'club' ? (
                 <>
-                  <OverviewMetrics
+                  {demoMode && !stats && <p role="status">Loading your club records...</p>}
+                  {(!demoMode || stats) && <OverviewMetrics
                     competitionCount={competitions.length}
                     totalRegistrations={totalRegistrations}
                     pendingApprovals={pendingApprovals}
@@ -369,7 +380,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
                     totalAttendance={totalAttendance}
                     attendanceRate={attendanceRate}
                     stats={stats}
-                  />
+                  />}
                   {stats && <AnalyticsDashboard stats={stats} />}
                 </>
               ) : (
@@ -492,7 +503,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               registrations={registrations}
               eventRegistrations={eventRegistrations}
               canApprove={canManageMembers}
-              canDelete={canManageMembers}
+              canDelete={!demoMode && canManageMembers}
               currentRole={role}
               onChanged={(nextMessage) => reloadWithMessage(nextMessage)}
             />
@@ -513,7 +524,8 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
           )
         )}
 
-        {view === 'settings' && (
+        {view === 'settings' && demoMode && <AccessNotice label="Account settings are unavailable in the demo" />}
+        {view === 'settings' && !demoMode && (
           <SettingsPanel
             currentUser={currentUser}
             settings={userSettings}

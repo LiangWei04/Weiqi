@@ -1,0 +1,60 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const ddl = fs.readFileSync(path.join(__dirname, "../../DDL.sql"), "utf8");
+const audit = fs.readFileSync(path.join(__dirname, "../configs/attendanceRequestAudit.sql"), "utf8")
+  .replace(/^BEGIN;\s*$/m, "").replace(/^COMMIT;\s*$/m, "");
+
+module.exports = async (client) => {
+  await client.query(ddl);
+  await client.query(audit);
+  const names = ['Demo Member', 'Avery Tan', 'Blair Lim', 'Casey Ng', 'Devon Lee', 'Ellis Goh', 'Finley Koh', 'Harper Teo', 'Jamie Low', 'Morgan Yeo', 'Quinn Foo', 'Riley Chua'];
+  const organiser = (await client.query("INSERT INTO users(name,username,email,role,status,email_verified) VALUES ('Demo Organiser','organiser','organiser@example.com','Captain','Active',true) RETURNING id")).rows[0].id;
+  const secretary = (await client.query("INSERT INTO users(name,username,email,role,status,email_verified) VALUES ('Demo Secretary','secretary','secretary@example.com','Secretary','Active',true) RETURNING id")).rows[0].id;
+  const members = [];
+  for (const [index, name] of names.entries()) {
+    const id = (await client.query("INSERT INTO users(name,username,email,role,status,email_verified) VALUES ($1,$2,$3,'Member','Active',true) RETURNING id", [name, `member${index}`, `member${index}@example.com`])).rows[0].id;
+    members.push(id);
+    await client.query("INSERT INTO player_profiles(user_id,school,rank_type,rank_value) VALUES ($1,'Fictional Academy','Kyu',$2)", [id, index + 1]);
+  }
+  await client.query("INSERT INTO user_settings(user_id) SELECT id FROM users");
+  const venue = (await client.query("INSERT INTO venues(name,address,capacity) VALUES ('Demo Club Room','Fictional campus',24) RETURNING id")).rows[0].id;
+  const eventIds = [];
+  for (const [title, offset, status, approval] of [['Beginner Workshop',7,'Open',true],['Open Board Practice',3,'Open',false],['Last Week’s Practice',-7,'Completed',false]]) {
+    const id = (await client.query(`INSERT INTO events(title,description,event_date,registration_deadline,venue_id,capacity,status,requires_approval,created_by)
+      VALUES ($1,'A fictional club activity for the interactive demo.',CURRENT_DATE + $2::integer,CURRENT_DATE + $2::integer - 1,$3,24,$4,$5,$6) RETURNING id`, [title,offset,venue,status,approval,organiser])).rows[0].id;
+    eventIds.push(id);
+    for (const member of members.slice(title === 'Beginner Workshop' ? 1 : 0, 7)) {
+      await client.query("INSERT INTO event_registrations(user_id,event_id,status,attended) VALUES ($1,$2,'Registered',$3)", [member,id,offset < 0 && member !== members[0]]);
+    }
+  }
+  const pastRegistration = (await client.query("SELECT id FROM event_registrations WHERE user_id=$1 AND event_id=$2", [members[0],eventIds[2]])).rows[0].id;
+  const request = (await client.query(`INSERT INTO attendance_change_requests(event_registration_id,requested_attended,reason,requested_by)
+    VALUES ($1,true,'The demo member attended, but their attendance was missed at check-in.',$2) RETURNING id`, [pastRegistration,secretary])).rows[0].id;
+  const format = (await client.query("INSERT INTO tournament_formats(name,description) VALUES ('Swiss','Pair players across rounds') RETURNING id")).rows[0].id;
+  const scoring = (await client.query("INSERT INTO scoring_systems(name,win_points,loss_points) VALUES ('Standard Win/Loss',1,0) RETURNING id")).rows[0].id;
+  const competitions = [];
+  const categories = [];
+  for (const completed of [false,true]) {
+    const competition = (await client.query(`INSERT INTO competitions(title,description,organizer_id,venue_id,start_date,end_date,status)
+      VALUES ($1,'Eight fictional players. Explore pairings, results and standings.',$2,$3,CURRENT_DATE + $4::integer,CURRENT_DATE + $4::integer + 1,$5) RETURNING id`,
+    [completed ? 'Completed Friendly Cup' : 'Demo Club Cup',organiser,venue,completed ? -15 : 0,completed ? 'Completed' : 'In Progress'])).rows[0].id;
+    competitions.push(competition);
+    const category = (await client.query("INSERT INTO competition_categories(competition_id,name,capacity) VALUES ($1,'Open',8) RETURNING id", [competition])).rows[0].id;
+    categories.push(category);
+    await client.query("INSERT INTO competition_settings(competition_id,tournament_format_id,scoring_system_id,round_count) VALUES ($1,$2,$3,3)", [competition,format,scoring]);
+    for (const [index,member] of members.slice(0,8).entries()) {
+      await client.query("INSERT INTO competition_registrations(user_id,category_id,status,attended,seed_number) VALUES ($1,$2,'Registered',true,$3)", [member,category,index+1]);
+    }
+    for (let roundNumber = 1; roundNumber <= 2; roundNumber++) {
+      const round = (await client.query("INSERT INTO competition_rounds(competition_id,category_id,round_number,status,generated_by) VALUES ($1,$2,$3,$4,$5) RETURNING id", [competition,category,roundNumber,completed || roundNumber === 1 ? 'Completed' : 'In Progress',organiser])).rows[0].id;
+      const pairs = roundNumber === 1 ? [[0,1],[2,3],[4,5],[6,7]] : [[0,2],[1,3],[4,6],[5,7]];
+      for (const [index,[black,white]] of pairs.entries()) {
+        const done = completed || roundNumber === 1 || index < 3;
+        await client.query(`INSERT INTO competition_matches(competition_id,category_id,round_id,table_number,black_user_id,white_user_id,result,winner_user_id,completed_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END)`, [competition,category,round,index+1,members[black],members[white],done ? 'Black Win' : 'Scheduled',done ? members[black] : null]);
+      }
+    }
+  }
+  await client.query("INSERT INTO notifications(user_id,title,message,type) VALUES ($1,'Attendance correction to review','Open the attendance scenario to review a missed check-in.','Attendance'),($2,'Welcome to the club','Try joining the Beginner Workshop.','Activity')", [organiser,members[0]]);
+  return { organiser, member: members[0], workshop: eventIds[0], pastEvent: eventIds[2], attendanceRequest: request, activeCompetition: competitions[0], activeCategory: categories[0] };
+};

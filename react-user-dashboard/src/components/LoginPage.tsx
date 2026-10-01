@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { getApiErrorMessage } from '../utils/apiErrors';
+import { demoMode } from '../utils/demo';
+import DemoEntry from './demo/DemoEntry';
 
 interface LoginFormInputs {
   identifier: string;
@@ -10,6 +12,10 @@ interface LoginFormInputs {
 }
 
 const LoginPage: React.FC = () => {
+  return demoMode ? <DemoEntry /> : <NormalLoginPage />;
+};
+
+const NormalLoginPage: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>();
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = React.useState('');

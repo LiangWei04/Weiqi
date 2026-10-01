@@ -743,6 +743,16 @@ module.exports.generateRound = async (data) => {
   try {
     await client.query("BEGIN");
 
+    // Serialize generation for this category so concurrent clicks cannot create
+    // duplicate rounds or bypass the bounded public demo.
+    await client.query("SELECT id FROM competition_categories WHERE id=$1 AND competition_id=$2 FOR UPDATE", [data.category_id, data.competition_id]);
+    if (process.env.DEMO_MODE === 'true') {
+      const rounds = await client.query("SELECT count(*)::integer AS count FROM competition_rounds WHERE category_id=$1", [data.category_id]);
+      if (rounds.rows[0].count >= 3) {
+        throw Object.assign(new Error('The three-round demo is complete. Reset to try again.'), { statusCode:409 });
+      }
+    }
+
     const existingOpenRound = await client.query(
       `
         SELECT r.id

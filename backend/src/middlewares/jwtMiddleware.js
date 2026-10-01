@@ -2,7 +2,7 @@ require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const db = require("../services/db");
 
-const secretKey = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET || "dev-secret-change-me";
+const secretKey = require("../configs/signingKey");
 const tokenDuration = process.env.JWT_EXPIRES_IN || "1d";
 const tokenAlgorithm = process.env.JWT_ALGORITHM || "HS256";
 
@@ -45,6 +45,10 @@ module.exports.sendToken = (req, res) => {
 };
 
 module.exports.verifyToken = (req, res, next) => {
+  if (process.env.DEMO_MODE === "true") {
+    if (!res.locals.demoSession) return res.status(401).json({ message: "Start a demo session first." });
+    return next();
+  }
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {

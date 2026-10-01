@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import apiClient from '../../utils/apiClient';
 import type { TournamentData } from '../../types/dashboard';
@@ -72,6 +73,12 @@ const TournamentOperationsPanel = ({
   onChanged: (message: string) => void | Promise<void>;
   onResultChanged: (message: string) => void | Promise<void>;
 }) => {
+  const dialogRef = React.useRef<HTMLElement>(null);
+  React.useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => previous?.focus();
+  }, []);
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<number | null>(null);
   const [workspaceTab, setWorkspaceTab] = React.useState<'pairings' | 'standings' | 'insights'>('pairings');
   const [resultUpdating, setResultUpdating] = React.useState(false);
@@ -94,7 +101,7 @@ const TournamentOperationsPanel = ({
   const roundBlockMessage = latestRoundNumber > 0 && unresolvedLatestRoundMatches.length > 0
     ? `Round ${latestRoundNumber} still has ${unresolvedLatestRoundMatches.length} scheduled match${unresolvedLatestRoundMatches.length === 1 ? '' : 'es'}. Enter all results before generating Round ${latestRoundNumber + 1}.`
     : '';
-  const actionBlockMessage = playerBlockMessage || roundBlockMessage;
+  const actionBlockMessage = (demoMode && latestRoundNumber >= 3 ? 'The three-round demo is complete. Reset to try again.' : '') || playerBlockMessage || roundBlockMessage;
   const canGenerateNextRound = Boolean(selectedCategory) && !actionBlockMessage && !roundGenerating && !resultUpdating;
 
   React.useEffect(() => {
@@ -134,6 +141,8 @@ const TournamentOperationsPanel = ({
     try {
       const response = await apiClient.put<{ message: string }>(`/competitions/matches/${matchId}/result`, { result });
       await onResultChanged(response.data.message);
+    } catch (error) {
+      await onChanged(getApiErrorMessage(error, 'Could not save this result. Please retry.'));
     } finally {
       await minimumDelay;
       setResultUpdating(false);
@@ -142,7 +151,15 @@ const TournamentOperationsPanel = ({
 
   return (
     <div className="edit-modal-backdrop tournament-workspace-backdrop" role="presentation">
-      <section className="tournament-workspace" role="dialog" aria-modal="true" aria-label={`${competitionTitle} tournament engine`}>
+      <section ref={dialogRef} tabIndex={-1} onKeyDown={(event) => {
+        if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+        if (event.key === 'Tab') {
+          const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),[href]')).filter((item) => item.offsetParent !== null);
+          const first = items[0], last = items[items.length-1];
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
+      }} className="tournament-workspace" role="dialog" aria-modal="true" aria-label={`${competitionTitle} tournament engine`}>
         {(resultUpdating || roundGenerating) && (
           <div className="tournament-loading-veil" role="status" aria-live="polite">
             <div>
@@ -160,7 +177,7 @@ const TournamentOperationsPanel = ({
           <div className="flex flex-wrap items-center gap-2">
             <select
               className="min-w-[190px] rounded-md border border-app-border bg-[#111] px-3 py-2 font-bold text-white"
-              value={selectedCategory?.id || ''}
+              aria-label="Tournament category" value={selectedCategory?.id || ''}
               onChange={(event) => setSelectedCategoryId(Number(event.target.value))}
             >
               {categories.map((category) => (
@@ -200,7 +217,7 @@ const TournamentOperationsPanel = ({
                     <button
                       type="button"
                       className={`primary-action compact ${!canGenerateNextRound ? 'is-disabled' : ''}`}
-                      aria-disabled={!canGenerateNextRound}
+                      disabled={!canGenerateNextRound} aria-disabled={!canGenerateNextRound}
                       onClick={generateRound}
                       title={actionBlockMessage || undefined}
                     >

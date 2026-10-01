@@ -2236,3 +2236,21 @@ table tr:hover td {
     grid-column: auto;
   }
 }
+
+/* Public demo guide: remains in normal document flow on small screens. */
+.demo-guide { margin-bottom: 24px; padding: 20px; border: 1px solid #34626a; border-radius: 16px; background: #172329; color: #f4fafa; }
+.demo-guide h2 { margin: 20px 0 8px; font-size: 1.55rem; }
+.demo-guide p { line-height: 1.6; color: #c6d8dc; }
+.demo-toolbar, .demo-reset { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.demo-toolbar > span { font-size: .8rem; color: #c6d8dc; }
+.demo-toolbar select { background: #111c22; color: white; padding: 8px; border: 1px solid #50737c; border-radius: 6px; }
+.demo-toolbar a { color: #7deafa; text-decoration: underline; }
+.demo-scenarios { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+.demo-scenarios button { display: grid; gap: 12px; text-align: left; padding: 18px; background: #101b21; color: white; border: 1px solid #34626a; border-radius: 10px; }
+.demo-scenarios button:hover { border-color: #00e5ff; }
+.demo-scenarios strong { color: #7deafa; }
+.demo-scenarios span { font-size: .9rem; line-height: 1.55; }
+.demo-scenarios small { color: #c6d8dc; }
+[data-demo-highlight="true"] { outline: 2px solid #5fe0ef; outline-offset: -2px; }
+.demo-guide :focus-visible, .auth-card :focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+@media(max-width: 900px) { .demo-scenarios { grid-template-columns: 1fr; } .demo-guide { padding: 14px; } }

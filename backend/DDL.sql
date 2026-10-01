@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS competitions (
   organizer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL,
   start_date DATE NOT NULL,
-  end_date DATE,
+  end_date DATE CHECK (end_date IS  not NULL and end_date > start_date),
   status VARCHAR(30) NOT NULL DEFAULT 'Draft'
     CHECK (status IN ('Draft', 'Open', 'In Progress', 'Completed', 'Cancelled')),
   schedule_text TEXT,
@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS competitions (
   arbiter_policy TEXT,
   rules_text TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
 );
 
 CREATE TABLE IF NOT EXISTS competition_categories (
@@ -179,10 +180,12 @@ CREATE TABLE IF NOT EXISTS attendance_change_requests (
   requested_attended BOOLEAN NOT NULL,
   reason TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'Pending'
-    CHECK (status IN ('Pending', 'Approved', 'Rejected')),
+    CHECK (status IN ('Pending', 'Approved', 'Rejected', 'Superseded')),
   requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMP,
+  replaces_request_id INTEGER REFERENCES attendance_change_requests(id),
+  superseded_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT attendance_change_requests_exact_registration CHECK (
     (event_registration_id IS NOT NULL AND competition_registration_id IS NULL)
@@ -198,6 +201,12 @@ WHERE status = 'Pending' AND event_registration_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_competition_one_pending
 ON attendance_change_requests (competition_registration_id)
 WHERE status = 'Pending' AND competition_registration_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_change_requests_one_replacement
+ON attendance_change_requests (replaces_request_id)
+WHERE replaces_request_id IS NOT NULL;
+
+-- Apply src/configs/attendanceRequestAudit.sql after this DDL for audit guards.
 
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,

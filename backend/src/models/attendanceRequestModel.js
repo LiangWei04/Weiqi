@@ -73,11 +73,6 @@ module.exports.insertEventRequest = (data, callback) => {
     WHERE er.id = $1
       AND er.status = 'Registered'
       AND (e.event_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
-    ON CONFLICT (event_registration_id) WHERE status = 'Pending' AND event_registration_id IS NOT NULL DO UPDATE SET
-      requested_attended = EXCLUDED.requested_attended,
-      reason = EXCLUDED.reason,
-      requested_by = EXCLUDED.requested_by,
-      created_at = CURRENT_TIMESTAMP
     RETURNING *;
   `;
   pool.query(SQLSTATEMENT, [data.registration_id, data.requested_attended, data.reason, data.requested_by], callback);
@@ -98,14 +93,42 @@ module.exports.insertCompetitionRequest = (data, callback) => {
     WHERE cr.id = $1
       AND cr.status = 'Registered'
       AND (c.start_date AT TIME ZONE 'Asia/Singapore')::date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore')::date
-    ON CONFLICT (competition_registration_id) WHERE status = 'Pending' AND competition_registration_id IS NOT NULL DO UPDATE SET
-      requested_attended = EXCLUDED.requested_attended,
-      reason = EXCLUDED.reason,
-      requested_by = EXCLUDED.requested_by,
-      created_at = CURRENT_TIMESTAMP
     RETURNING *;
   `;
   pool.query(SQLSTATEMENT, [data.registration_id, data.requested_attended, data.reason, data.requested_by], callback);
+};
+
+module.exports.replace = async (data) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Approval, rejection and replacement all compete for this same pending row.
+    const previous = await client.query(`
+      UPDATE attendance_change_requests
+      SET status = 'Superseded', superseded_at = CURRENT_TIMESTAMP
+      WHERE id = $1 AND status = 'Pending'
+      RETURNING *;
+    `, [data.request_id]);
+    if (previous.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const original = previous.rows[0];
+    const replacement = await client.query(`
+      INSERT INTO attendance_change_requests (
+        event_registration_id, competition_registration_id,
+        requested_attended, reason, requested_by, replaces_request_id
+      ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+    `, [original.event_registration_id, original.competition_registration_id,
+      data.requested_attended, data.reason, data.requested_by, original.id]);
+    await client.query("COMMIT");
+    return replacement.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 module.exports.approve = async (data) => {

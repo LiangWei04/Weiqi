@@ -1,3 +1,4 @@
+import { demoMode } from '../../utils/demo';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
@@ -32,8 +33,14 @@ const AttendancePanel = ({
     name: string;
     detail: string;
     currentAttended: boolean;
+    replacesRequestId?: number;
   } | null>(null);
   const [requestReason, setRequestReason] = React.useState('');
+  const [requestedAttended, setRequestedAttended] = React.useState<boolean | null>(null);
+  const [requestSaving, setRequestSaving] = React.useState(false);
+  const [requestError, setRequestError] = React.useState('');
+  const [reviewingRequestId, setReviewingRequestId] = React.useState<number | null>(null);
+  const [reviewError, setReviewError] = React.useState('');
   const pendingCompetitionRegistrations = registrations.filter((registration) => registration.status === 'Pending Approval');
   const pendingEventRegistrations = eventRegistrations.filter((registration) => registration.status === 'Pending Approval');
   const approvedCompetitionRegistrations = registrations.filter((registration) => registration.status === 'Registered');
@@ -226,37 +233,53 @@ const AttendancePanel = ({
   };
 
   const requestPastAttendanceChange = async () => {
-    if (!requestTarget) {
+    if (!requestTarget || requestSaving) {
       return;
     }
 
     if (!requestReason.trim()) {
-      onStatusChanged('Please enter a reason for Captain approval.');
+      setRequestError('Please enter a reason for Captain approval.');
       return;
     }
 
+    setRequestSaving(true);
+    setRequestError('');
     try {
-      const path = requestTarget.type === 'Competition'
+      const path = requestTarget.replacesRequestId
+        ? `/attendance-requests/${requestTarget.replacesRequestId}/replacements`
+        : requestTarget.type === 'Competition'
         ? `/attendance-requests/competitions/${requestTarget.id}`
         : `/attendance-requests/events/${requestTarget.id}`;
       await apiClient.post(path, {
-        attended: !requestTarget.currentAttended,
+        attended: requestedAttended ?? !requestTarget.currentAttended,
         reason: requestReason.trim(),
       });
       setRequestTarget(null);
       setRequestReason('');
+      setRequestedAttended(null);
       onStatusChanged('Attendance change request sent to Captain.');
     } catch (error) {
-      onStatusChanged(getErrorMessage(error, 'Could not send attendance change request.'));
+      const message = getErrorMessage(error, 'No confirmation was received. Refresh and check pending requests before submitting again.');
+      setRequestError(message);
+      onStatusChanged(message);
+    } finally {
+      setRequestSaving(false);
     }
   };
 
   const reviewAttendanceRequest = async (requestId: number, action: 'approve' | 'reject') => {
+    if (reviewingRequestId !== null) return;
+    setReviewingRequestId(requestId);
+    setReviewError('');
     try {
       await apiClient.put(`/attendance-requests/${requestId}/${action}`);
       onStatusChanged(`Attendance request ${action === 'approve' ? 'approved' : 'rejected'}.`);
     } catch (error) {
-      onStatusChanged(getErrorMessage(error, `Could not ${action} attendance request.`));
+      const message = getErrorMessage(error, 'No confirmation was received. Refresh to check the decision before retrying.');
+      setReviewError(message);
+      onStatusChanged(message);
+    } finally {
+      setReviewingRequestId(null);
     }
   };
 
@@ -273,7 +296,7 @@ const AttendancePanel = ({
           </NavLink>
         )}
       </div>
-      {currentRole === 'Captain' && (
+      {['Captain', 'Vice-Captain', 'Secretary'].includes(currentRole) && (
         <div className="panel-section">
           <div className="panel-heading">
             <div>
@@ -282,8 +305,9 @@ const AttendancePanel = ({
             </div>
           </div>
           <div className="data-list">
+            {reviewError && <p role="alert">{reviewError}</p>}
             {attendanceRequests.map((request) => (
-              <article key={request.id} className="data-row">
+              <article key={request.id} className="data-row" data-demo-highlight={demoMode ? "true" : undefined}>
                 <span>
                   <strong>{request.member_name}</strong>
                   <small>
@@ -298,8 +322,18 @@ const AttendancePanel = ({
                 </span>
                 <span className="status-pill warning">Pending</span>
                 <span className="row-actions">
-                  <button type="button" className="secondary-action compact" onClick={() => reviewAttendanceRequest(request.id, 'approve')}>Approve</button>
-                  <button type="button" className="secondary-action compact" onClick={() => reviewAttendanceRequest(request.id, 'reject')}>Reject</button>
+                  {!demoMode && <button type="button" className="secondary-action compact" disabled={requestSaving || reviewingRequestId !== null} onClick={() => {
+                    setRequestTarget({ id: request.registration_id, type: request.activity_type,
+                      name: request.member_name, detail: request.activity_title,
+                      currentAttended: request.current_attended, replacesRequestId: request.id });
+                    setRequestedAttended(request.requested_attended);
+                    setRequestReason(request.reason || '');
+                    setRequestError('');
+                  }}>Replace</button>}
+                  {currentRole === 'Captain' && <>
+                    <button type="button" className="secondary-action compact" disabled={reviewingRequestId !== null || requestSaving} onClick={() => reviewAttendanceRequest(request.id, 'approve')}>Approve</button>
+                    <button type="button" className="secondary-action compact" disabled={reviewingRequestId !== null || requestSaving} onClick={() => reviewAttendanceRequest(request.id, 'reject')}>Reject</button>
+                  </>}
                 </span>
               </article>
             ))}
@@ -401,11 +435,11 @@ const AttendancePanel = ({
             <div className="attendance-bulk-bar">
               <div>
                 <strong>{selectedAttendanceActivity.present}/{selectedAttendanceActivity.rows.length} present</strong>
-                <small>Mark everyone present first, then untick members who did not attend.</small>
+                <small>{demoMode ? 'Read-only attendance. Use the seeded correction request to try an approval.' : 'Mark everyone present first, then untick members who did not attend.'}</small>
               </div>
-              <button type="button" className="primary-action compact" onClick={markActivityPresent}>
+              {!demoMode && <button type="button" className="primary-action compact" onClick={markActivityPresent}>
                 Mark All Present
-              </button>
+              </button>}
             </div>
             <div className="data-list">
               {selectedAttendanceActivity.rows.map((registration) => {
@@ -416,7 +450,7 @@ const AttendancePanel = ({
                       <strong>{registration.name}</strong>
                       <small>{registration.type === 'Competition' ? registration.detail : selectedAttendanceActivity.detail}</small>
                     </span>
-                    {attendanceState.canRequest ? (
+                    {!demoMode && attendanceState.canRequest ? (
                       <button
                         type="button"
                         className="secondary-action compact"
@@ -436,7 +470,7 @@ const AttendancePanel = ({
                         <input
                           type="checkbox"
                           checked={registration.attended}
-                          disabled={!attendanceState.canMark}
+                          disabled={demoMode || !attendanceState.canMark}
                           onChange={(event) => {
                             if (registration.type === 'Competition') {
                               updateCompetitionAttendance(registration.id, event.target.checked);
@@ -457,29 +491,41 @@ const AttendancePanel = ({
       )}
       {requestTarget && (
         <div className="dialog-backdrop" role="presentation">
-          <div className="confirm-dialog" role="dialog" aria-modal="true">
-            <h3>Request Captain Approval</h3>
+          <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="attendance-request-title">
+            <h3 id="attendance-request-title">{requestTarget.replacesRequestId ? 'Replace Pending Request' : 'New Correction Request'}</h3>
             <p>
-              Request to mark {requestTarget.name} as {requestTarget.currentAttended ? 'not present' : 'present'} for {requestTarget.detail}.
+              Request a correction for {requestTarget.name} at {requestTarget.detail}.
             </p>
+            {requestTarget.replacesRequestId && <p>The previous request will be preserved as Superseded. A reviewed request cannot be replaced.</p>}
+            <label className="form-field">
+              <span>Requested attendance</span>
+              <select disabled={requestSaving} value={String(requestedAttended ?? !requestTarget.currentAttended)} onChange={(event) => setRequestedAttended(event.target.value === 'true')}>
+                <option value="true">Present</option>
+                <option value="false">Not present</option>
+              </select>
+            </label>
             <label className="form-field">
               <span>Reason</span>
               <textarea
+                disabled={requestSaving}
                 value={requestReason}
                 onChange={(event) => setRequestReason(event.target.value)}
                 rows={4}
                 placeholder="Explain why this past attendance record needs to change"
               />
             </label>
+            {requestError && <p role="alert">{requestError}</p>}
             <div className="dialog-actions">
-              <button type="button" className="secondary-action compact" onClick={() => {
+              <button type="button" className="secondary-action compact" disabled={requestSaving} onClick={() => {
                 setRequestTarget(null);
                 setRequestReason('');
+                setRequestedAttended(null);
+                setRequestError('');
               }}>
                 Cancel
               </button>
-              <button type="button" className="primary-action compact" onClick={requestPastAttendanceChange}>
-                Send Request
+              <button type="button" className="primary-action compact" disabled={requestSaving} onClick={requestPastAttendanceChange}>
+                {requestSaving ? 'Sending…' : requestTarget.replacesRequestId ? 'Send Replacement' : 'Send New Request'}
               </button>
             </div>
           </div>
