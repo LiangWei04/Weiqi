@@ -27,6 +27,21 @@ module.exports = async (client) => {
       await client.query("INSERT INTO event_registrations(user_id,event_id,status,attended) VALUES ($1,$2,'Registered',$3)", [member,id,offset < 0 && member !== members[0]]);
     }
   }
+  // Give the charts a real fictional history instead of a single creation-day spike.
+  for (const [week, title] of ['Opening Moves Clinic', 'Reading & Life-and-Death', 'Handicap Games Evening', 'Endgame Workshop', 'Friendly Ladder Night'].entries()) {
+    const offset = -42 + week * 7;
+    const id = (await client.query(`INSERT INTO events(title,description,event_date,registration_deadline,venue_id,capacity,status,requires_approval,created_by,created_at)
+      VALUES ($1,$2,CURRENT_DATE+$3::integer,CURRENT_DATE+$3::integer-1,$4,16,'Completed',false,$5,now()+($3::integer-10)*interval '1 day') RETURNING id`,
+    [title,'A past fictional club session: guided play, paired games and a group review.',offset,venue,organiser])).rows[0].id;
+    for (let index = 0; index < 7 + week; index++) {
+      await client.query(`INSERT INTO event_registrations(user_id,event_id,status,attended,created_at)
+        VALUES ($1,$2,'Registered',$3,now()+$4::integer*interval '1 day')`,
+      [members[index],id,index % 5 !== week % 5,offset-7+index%6]);
+    }
+  }
+  await client.query(`UPDATE event_registrations r SET created_at = LEAST(now()-interval '2 hours',e.event_date::timestamp-interval '4 days'-(r.user_id%5)*interval '1 day')
+    FROM events e WHERE r.event_id=e.id AND e.id=ANY($1::integer[])`, [eventIds]);
+  await client.query(`UPDATE events SET created_at=event_date::timestamp-interval '14 days' WHERE id=ANY($1::integer[])`, [eventIds]);
   const pastRegistration = (await client.query("SELECT id FROM event_registrations WHERE user_id=$1 AND event_id=$2", [members[0],eventIds[2]])).rows[0].id;
   const request = (await client.query(`INSERT INTO attendance_change_requests(event_registration_id,requested_attended,reason,requested_by)
     VALUES ($1,true,'The demo member attended, but their attendance was missed at check-in.',$2) RETURNING id`, [pastRegistration,secretary])).rows[0].id;
@@ -51,10 +66,12 @@ module.exports = async (client) => {
       for (const [index,[black,white]] of pairs.entries()) {
         const done = completed || roundNumber === 1 || index < 3;
         await client.query(`INSERT INTO competition_matches(competition_id,category_id,round_id,table_number,black_user_id,white_user_id,result,winner_user_id,completed_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END)`, [competition,category,round,index+1,members[black],members[white],done ? 'Black Win' : 'Scheduled',done ? members[black] : null]);
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN $8::integer IS NULL THEN NULL ELSE now()+$9::integer*interval '1 day' END)`, [competition,category,round,index+1,members[black],members[white],done ? 'Black Win' : 'Scheduled',done ? members[black] : null,completed ? -15 : 0]);
       }
     }
   }
+  await client.query(`UPDATE competition_registrations r SET registered_at=c.start_date::timestamp-interval '3 days'-(r.user_id%7)*interval '1 day'
+    FROM competition_categories cat JOIN competitions c ON c.id=cat.competition_id WHERE r.category_id=cat.id`);
   await client.query("INSERT INTO notifications(user_id,title,message,type) VALUES ($1,'Attendance correction to review','Open the attendance scenario to review a missed check-in.','Attendance'),($2,'Welcome to the club','Try joining the Beginner Workshop.','Activity')", [organiser,members[0]]);
   return { organiser, member: members[0], workshop: eventIds[0], pastEvent: eventIds[2], attendanceRequest: request, activeCompetition: competitions[0], activeCategory: categories[0] };
 };

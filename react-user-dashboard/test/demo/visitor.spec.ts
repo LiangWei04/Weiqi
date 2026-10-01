@@ -9,9 +9,12 @@ test('visitor completes three workflows and resets their private club',async ({p
   await expect(page.getByRole('heading',{name:'Explore a fictional Weiqi club'})).toBeVisible();
   await expect(page.getByText('Demo Organiser - organiser@example.com')).toBeVisible();
   await expect(page.getByText('14 active, 0 inactive')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Leading players'})).toBeVisible();
+  await expect(page.getByText('6 completed',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'One check-in to put right.'})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('dashboard.png')});
   await page.getByRole('button',{name:/01 · Run a tournament/}).click();
-  await expect(page.getByRole('heading',{name:'Demo Club Cup',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Demo Club Cup',exact:true,level:2})).toBeVisible();
   await page.getByRole('button',{name:'Open Tournament Engine'}).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();

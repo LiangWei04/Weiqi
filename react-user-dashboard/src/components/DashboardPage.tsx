@@ -1,6 +1,7 @@
 import React from 'react';
 import { authStorage, demoMode } from '../utils/demo';
 import DemoGuide from './demo/DemoGuide';
+import DemoOverview from './demo/DemoOverview';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import type {
@@ -82,6 +83,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [memberStats, setMemberStats] = React.useState<MemberStats | null>(null);
   const [dashboardTab, setDashboardTab] = React.useState<'club' | 'personal'>('club');
+  const [analyticsExpanded, setAnalyticsExpanded] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [toasts, setToasts] = React.useState<Array<{ id: number; message: string }>>([]);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
@@ -372,7 +374,8 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
               {dashboardTab === 'club' ? (
                 <>
                   {demoMode && !stats && <p role="status">Loading your club records...</p>}
-                  {(!demoMode || stats) && <OverviewMetrics
+                  {demoMode && stats && <DemoOverview events={events} competitions={competitions} stats={stats} requests={attendanceRequests} />}
+                  {!demoMode && <OverviewMetrics
                     competitionCount={competitions.length}
                     totalRegistrations={totalRegistrations}
                     pendingApprovals={pendingApprovals}
@@ -381,7 +384,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
                     attendanceRate={attendanceRate}
                     stats={stats}
                   />}
-                  {stats && <AnalyticsDashboard stats={stats} />}
+                  {stats && (demoMode ? <details className="club-more" onToggle={event => setAnalyticsExpanded(event.currentTarget.open)}><summary>Explore detailed club analytics</summary>{analyticsExpanded && <AnalyticsDashboard stats={stats} />}</details> : <AnalyticsDashboard stats={stats} />)}
                 </>
               ) : (
                 <MemberStatsDashboard stats={memberStats} currentUser={currentUser} />

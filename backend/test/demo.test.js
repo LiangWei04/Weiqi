@@ -41,6 +41,11 @@ test('real seeded dashboard and read surfaces load',async () => {
     const response = await api(path,a.token);
     assert.equal(response.status,200,`${path}: ${JSON.stringify(response.data)}`);
   }
+  const events = (await api('/events',a.token)).data;
+  assert.equal(events.filter(event => event.status === 'Completed').length,6);
+  const stats = (await api('/dashboard/stats',a.token)).data;
+  assert.equal(stats.total_events,8);
+  assert.ok(stats.registrations_over_time.length > 1,'Historical registrations must span multiple dates');
 });
 test('member signup, organiser approval and isolated data',async () => {
   const member = (await api('/demo/persona',a.token,'POST',{persona:'member'})).data;
