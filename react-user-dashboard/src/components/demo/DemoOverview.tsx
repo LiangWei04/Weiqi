@@ -1,4 +1,5 @@
 import React from 'react';
+import ClubAnalytics, { OperationalMetrics } from '../dashboard/ClubAnalytics';
 import { Link } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
 import type { AttendanceChangeRequest, Competition, DashboardStats, EventItem, TournamentData } from '../../types/dashboard';
@@ -46,8 +47,9 @@ export default function DemoOverview({ events, competitions, stats, requests }: 
         <Link className="club-cta" to={tournamentUrl}>Open tournament &amp; record a result <span aria-hidden="true">↗</span></Link>
       </article>
       <article className="club-schedule"><p className="club-kicker">NEXT AT THE CLUB</p><h2>Make room for a game.</h2><div className="club-agenda">{upcoming.map(item => <Link to="/events?demo=signup" key={item.id}><time dateTime={item.event_date}><strong>{new Date(item.event_date).getDate()}</strong><span>{new Date(item.event_date).toLocaleDateString('en-SG',{month:'short'})}</span></time><div><h3>{item.title}</h3><p>{item.venue} · {item.registered}/{item.capacity} places filled</p><progress aria-label={`${item.title} places filled`} value={Number(item.registered)} max={Number(item.capacity)}/></div><span aria-hidden="true">↗</span></Link>)}</div><p className="club-footnote">Switch to Member to try a workshop signup.</p></article>
-      <article className="club-history"><div className="club-section-heading"><div><p className="club-kicker">A CLUB IN MOTION</p><h2>Recent sessions</h2></div><span>{history.length} completed</span></div><p className="club-footnote">Actual check-ins from the fictional session records.</p><div className="club-attendance-bars">{history.map(item => <div key={item.id} className="club-bar-column"><span>{item.attended}/{item.registered}</span><div className="club-bar-track"><div style={{height:`${Number(item.registered) ? Number(item.attended)/Number(item.registered)*100 : 0}%`}}/></div><time dateTime={item.event_date}>{new Date(item.event_date).toLocaleDateString('en-SG',{day:'numeric',month:'short'})}</time><small>{item.title}</small></div>)}</div></article>
       <article className="club-review"><p className="club-kicker">COMMITTEE DESK</p><h2>{pending.length ? 'One check-in to put right.' : 'All caught up.'}</h2>{pending[0] ? <><span className="club-review-badge">Pending attendance review</span><h3>{pending[0].member_name}</h3><p>{pending[0].activity_title} · {formatDate(pending[0].activity_date)}</p><blockquote>{pending[0].reason}</blockquote><Link className="club-cta" to="/attendance?demo=attendance">Review the request <span aria-hidden="true">↗</span></Link></> : <p>No pending attendance corrections. Browse the decision history in Attendance.</p>}</article>
+      <OperationalMetrics stats={stats} />
     </div>
+    <ClubAnalytics stats={stats} events={events} competitions={competitions} />
   </section>;
 }

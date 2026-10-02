@@ -10,7 +10,8 @@ test('visitor completes three workflows and resets their private club',async ({p
   await expect(page.getByText('Demo Organiser - organiser@example.com')).toBeVisible();
   await expect(page.getByText('14 active, 0 inactive')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Leading players'})).toBeVisible();
-  await expect(page.getByText('6 completed',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Attendance quality',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Event popularity',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'One check-in to put right.'})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('dashboard.png')});
   await page.getByRole('button',{name:/01 · Run a tournament/}).click();
@@ -28,6 +29,7 @@ test('visitor completes three workflows and resets their private club',async ({p
   await dialog.getByRole('button',{name:/Generate.*Round/}).click();
   await expect(dialog.getByText('R3 - Table 1')).toBeVisible();
   await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('.demo-walkthrough > summary').click();
   await expect(page.getByText('Round 2 results complete',{exact:false})).toBeVisible();
   await page.getByRole('button',{name:/02 · Manage a signup/}).click();
   await page.getByRole('combobox',{name:'Demo persona'}).selectOption('member');
@@ -42,6 +44,9 @@ test('visitor completes three workflows and resets their private club',async ({p
   const signup = page.locator('.member-registration-row').filter({hasText:'Beginner Workshop'});
   await signup.getByRole('button',{name:'Approve',exact:true}).click();
   await expect(signup.getByText('Registered',{exact:true})).toBeVisible();
+  await page.getByRole('dialog',{name:'Demo Member',exact:true}).getByRole('button',{name:'Close',exact:true}).click();
+  await expect(page.locator('button.member-card-toggle').filter({hasText:'Demo Member'})).toBeFocused();
+  await page.locator('.demo-walkthrough > summary').click();
 
   await page.getByRole('button',{name:/03 · Resolve an attendance request/}).click();
   const correction = page.locator('article[data-demo-highlight="true"]');
@@ -49,12 +54,39 @@ test('visitor completes three workflows and resets their private club',async ({p
   await page.getByRole('button',{name:'Dismiss notification',exact:true}).all().then(async (items) => { for (const item of items) await item.click(); });
   await page.screenshot({path:testInfo.outputPath('attendance.png')});
   await correction.getByRole('button',{name:'Approve',exact:true}).click();
+  await page.locator('.demo-walkthrough > summary').click();
   await expect(page.getByText(/Decision: Approved/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Replace',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Reset demo',exact:true}).click();
   await page.getByRole('button',{name:'Yes, reset demo'}).click();
   await expect(page.getByText(/Member signup: Not registered/)).toBeVisible();
   await expect(page.getByText(/Decision: Pending/)).toBeVisible();
+  for (const route of ['dashboard', 'events', 'competitions', 'attendance', 'members']) {
+    await page.goto(`/${route}`);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    if (route === 'dashboard') await expect(page.getByRole('heading', { name: 'Leading players' })).toBeVisible();
+    if (route === 'events') await expect(page.getByRole('heading', { name: 'Beginner Workshop' })).toBeVisible();
+    if (route === 'competitions') await expect(page.getByRole('button', { name: 'Open Tournament Engine' })).toBeVisible();
+    if (route === 'members') await expect(page.locator('.member-card-toggle').first()).toBeVisible();
+    await page.screenshot({path:testInfo.outputPath(`${route}-rose-desktop.png`),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({path:testInfo.outputPath(`${route}-rose-mobile.png`),fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});
+  }
+  await page.locator('.member-card-toggle').filter({hasText:'Demo Member'}).click();
+  await expect(page.getByRole('dialog',{name:'Demo Member',exact:true})).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('member-details-rose.png')});
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.member-card-toggle').filter({hasText:'Demo Member'})).toBeFocused();
+  await page.getByRole('link',{name:'Attendance',exact:true}).click();
+  await page.locator('.activity-attendance-card').filter({hasText:'Last Week'}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('attendance-details-rose.png')});
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.goto('/dashboard');
   await page.setViewportSize({width:390,height:844});
   await expect(page.getByRole('combobox',{name:'Demo persona'})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('mobile.png'),fullPage:true});

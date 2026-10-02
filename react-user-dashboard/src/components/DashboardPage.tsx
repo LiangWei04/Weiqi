@@ -83,7 +83,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [memberStats, setMemberStats] = React.useState<MemberStats | null>(null);
   const [dashboardTab, setDashboardTab] = React.useState<'club' | 'personal'>('club');
-  const [analyticsExpanded, setAnalyticsExpanded] = React.useState(false);
+
   const [message, setMessage] = React.useState('');
   const [toasts, setToasts] = React.useState<Array<{ id: number; message: string }>>([]);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
@@ -226,7 +226,9 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
         const detailResponse = await apiClient.get<CompetitionDetail>(`/competitions/${selectedCompetitionId}`);
         setSelectedCompetition(detailResponse.data);
       } else {
-        const demoCompetitionId = demoMode ? Number(new URLSearchParams(window.location.search).get('competition')) : 0;
+        const demoCompetitionId = demoMode ? Number(new URLSearchParams(window.location.search).get('competition'))
+          || nextVisibleCompetitions.find(item => item.status === 'In Progress')?.id
+          || nextVisibleCompetitions[0]?.id : 0;
         if (demoCompetitionId && nextVisibleCompetitions.some((item) => item.id === demoCompetitionId)) {
           setSelectedCompetition((await apiClient.get<CompetitionDetail>(`/competitions/${demoCompetitionId}`)).data);
         } else setSelectedCompetition(null);
@@ -326,9 +328,9 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-[radial-gradient(circle_at_84%_0%,rgba(0,229,255,0.1),transparent_26%),#121212] lg:grid-cols-[260px_minmax(0,1fr)]">
+    <main className="app-shell">
       <Sidebar canManageAttendance={canManageAttendance} canManageMembers={canManageMembers} canManageUsers={canManageUsers} />
-      <section className="min-w-0 p-5 text-white md:p-7">
+      <section className="main-panel">
         {demoMode && <DemoGuide />}
         <HeaderBar
           eyebrow={pageTitles[view].eyebrow}
@@ -384,7 +386,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
                     attendanceRate={attendanceRate}
                     stats={stats}
                   />}
-                  {stats && (demoMode ? <details className="club-more" onToggle={event => setAnalyticsExpanded(event.currentTarget.open)}><summary>Explore detailed club analytics</summary>{analyticsExpanded && <AnalyticsDashboard stats={stats} />}</details> : <AnalyticsDashboard stats={stats} />)}
+                  {stats && !demoMode && <AnalyticsDashboard stats={stats} />}
                 </>
               ) : (
                 <MemberStatsDashboard stats={memberStats} currentUser={currentUser} />
@@ -545,6 +547,7 @@ const DashboardPage: React.FC<{ view?: DashboardView }> = ({ view = 'analytics' 
             onDeactivate={() => setDeactivateConfirmOpen(true)}
           />
         )}
+        <footer className="site-footer">TourneyHub · Coursework application{demoMode ? ' · Fictional demonstration data' : ''}</footer>
         <ConfirmDeleteDialog
           open={deactivateConfirmOpen}
           title="Deactivate your account?"

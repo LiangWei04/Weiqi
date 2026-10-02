@@ -21,24 +21,24 @@ const SignalCard = ({
     tone === 'warn' ? 'border-l-4 border-l-app-amber' : '',
     tone === 'danger' ? 'border-l-4 border-l-app-red' : '',
   ].join(' ')}>
-    <span className="block text-[0.82rem] font-extrabold text-app-muted">{label}</span>
-    <strong className="mt-2 block font-mono text-3xl font-black text-white">{value}</strong>
-    <small className="mt-1 block text-[0.82rem] font-extrabold text-app-muted">{detail}</small>
+    <span className="block text-[0.82rem] font-semibold text-app-muted">{label}</span>
+    <strong className="mt-2 block font-mono text-3xl font-bold text-app-text">{value}</strong>
+    <small className="mt-1 block text-[0.82rem] font-semibold text-app-muted">{detail}</small>
   </article>
 );
 
 const Insight = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
-  <article className="rounded-2xl border border-app-border bg-app-surfaceSoft p-4">
-    <span className="block text-[0.78rem] font-extrabold uppercase tracking-wide text-app-muted">{label}</span>
-    <strong className="mt-2 block truncate text-base font-black text-app-cyan" title={value}>{value}</strong>
+  <article className={`rounded-2xl border border-app-border bg-app-surfaceSoft p-4 ${label === 'Completion' ? 'completion-card' : ''}`}>
+    <span className="block text-[0.78rem] font-semibold uppercase tracking-wide text-app-muted">{label}</span>
+    <strong className="mt-2 block truncate text-base font-bold text-app-cyan" title={value}>{value}</strong>
     <small className="mt-1 block text-[0.78rem] font-bold text-app-muted">{detail}</small>
   </article>
 );
 
 const ChartHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-    <h3 className="m-0 text-base font-black text-app-cyan">{title}</h3>
-    <span className="max-w-xl text-left text-[0.82rem] font-extrabold leading-5 text-app-muted md:text-right">{subtitle}</span>
+    <h3 className="m-0 text-base font-bold text-app-cyan">{title}</h3>
+    <span className="max-w-xl text-left text-[0.82rem] font-semibold leading-5 text-app-muted md:text-right">{subtitle}</span>
   </div>
 );
 
@@ -171,12 +171,12 @@ const TournamentOperationsPanel = ({
         )}
         <div className="tournament-workspace-head">
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Tournament engine</p>
-            <h3 className="m-0 text-2xl font-black text-white">{competitionTitle}</h3>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Tournament engine</p>
+            <h3 className="m-0 text-2xl font-bold text-app-text">{competitionTitle}</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
-              className="min-w-[190px] rounded-md border border-app-border bg-[#111] px-3 py-2 font-bold text-white"
+              className="min-w-[190px] rounded-md border border-app-border bg-[#FCF8F8] px-3 py-2 font-bold text-app-text"
               aria-label="Tournament category" value={selectedCategory?.id || ''}
               onChange={(event) => setSelectedCategoryId(Number(event.target.value))}
             >
@@ -232,14 +232,14 @@ const TournamentOperationsPanel = ({
                 )}
                 <div className="grid gap-3">
                   {latestRoundMatches.map((match) => (
-                    <article key={match.id} className="grid gap-3 rounded-lg border border-app-border bg-[#181818] p-3 md:grid-cols-[150px_minmax(0,1fr)_220px] md:items-center">
+                    <article key={match.id} className={`grid gap-3 rounded-lg border border-app-border p-3 md:grid-cols-[150px_minmax(0,1fr)_220px] md:items-center ${match.result === 'Scheduled' ? 'pairing-attention' : 'bg-app-surface'}`}>
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <strong className="text-white">R{match.round_number} - Table {match.table_number}</strong>
+                        <strong className="text-app-text">R{match.round_number} - Table {match.table_number}</strong>
                         <span className="status-pill">{match.result}</span>
                       </div>
                       <div className="grid gap-2 text-sm text-app-muted md:grid-cols-2">
-                        <span><strong className="text-white">Black:</strong> {match.black_name || 'Bye'}</span>
-                        <span><strong className="text-white">White:</strong> {match.white_name || 'Bye'}</span>
+                        <span><strong className="text-app-text">Black:</strong> {match.black_name || 'Bye'}</span>
+                        <span><strong className="text-app-text">White:</strong> {match.white_name || 'Bye'}</span>
                       </div>
                       {canManage && match.white_user_id && (
                         <label className="form-field mt-3">

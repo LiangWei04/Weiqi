@@ -16,15 +16,15 @@ import type { CurrentUser, DashboardStats, MemberStats, NamedTotal } from '../..
 import { formatDate, formatMonth, formatShortDate } from '../../utils/formatters';
 
 const chartPalette = {
-  cyan: '#00e5ff',
-  green: '#32d74b',
-  red: '#ff453a',
-  amber: '#ffd60a',
+  cyan: '#A84466',
+  green: '#4C7666',
+  red: '#B63E57',
+  amber: '#80555D',
   blue: '#4f8cff',
   purple: '#bf5af2',
-  grid: '#2c2c2e',
-  text: '#ffffff',
-  muted: '#98989d',
+  grid: '#EADDDD',
+  text: '#342D32',
+  muted: '#76686F',
 };
 
 ChartJS.register(
@@ -85,8 +85,8 @@ const MemberStatsDashboard = ({
   if (!stats) {
     return (
       <section className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-panel">
-        <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
-        <h2 className="m-0 text-2xl font-black text-white">Loading your activity stats</h2>
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
+        <h2 className="m-0 text-2xl font-bold text-app-text">Loading your activity stats</h2>
       </section>
     );
   }
@@ -106,7 +106,7 @@ const MemberStatsDashboard = ({
     datasets: [{
       data: statusItems.map((item) => item.total),
       backgroundColor: [chartPalette.green, chartPalette.amber, chartPalette.red, chartPalette.blue, chartPalette.purple],
-      borderColor: '#1e1e1e',
+      borderColor: '#342D32',
       borderWidth: 2,
     }],
   };
@@ -124,7 +124,7 @@ const MemberStatsDashboard = ({
     datasets: [{
       data: [stats.attended_count, missedApproved],
       backgroundColor: [chartPalette.green, 'rgba(255,255,255,0.12)'],
-      borderColor: '#1e1e1e',
+      borderColor: '#342D32',
       borderWidth: 2,
     }],
   };
@@ -155,7 +155,7 @@ const MemberStatsDashboard = ({
       borderColor: chartPalette.cyan,
       backgroundColor: 'rgba(0, 229, 255, 0.14)',
       pointBackgroundColor: chartPalette.cyan,
-      pointBorderColor: '#121212',
+      pointBorderColor: '#FCF8F8',
       pointRadius: 5,
       tension: 0.35,
       fill: true,
@@ -167,7 +167,7 @@ const MemberStatsDashboard = ({
     datasets: [{
       data: resultItems.length > 0 ? resultItems.map((item) => item.total) : [1],
       backgroundColor: resultItems.length > 0 ? [chartPalette.green, chartPalette.red, chartPalette.blue] : ['rgba(255,255,255,0.12)'],
-      borderColor: '#1e1e1e',
+      borderColor: '#342D32',
       borderWidth: 2,
     }],
   };
@@ -213,7 +213,7 @@ const MemberStatsDashboard = ({
       backgroundColor: contributionItems.length > 0
         ? [chartPalette.cyan, chartPalette.green, chartPalette.amber, chartPalette.blue, chartPalette.purple, chartPalette.red]
         : ['rgba(255,255,255,0.12)'],
-      borderColor: '#1e1e1e',
+      borderColor: '#342D32',
       borderWidth: 2,
     }],
   };
@@ -249,17 +249,17 @@ const MemberStatsDashboard = ({
 
   return (
     <section className="grid gap-4" aria-label="Member dashboard">
-      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.18),transparent_28%),linear-gradient(135deg,#1e1e1e,#121212)] p-6 shadow-panel lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.18),transparent_28%),linear-gradient(135deg,#342D32,#FCF8F8)] p-6 shadow-panel lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
-          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
-          <h2 className="m-0 text-3xl font-black text-white md:text-5xl">My CCA Activity</h2>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
+          <h2 className="m-0 text-3xl font-bold text-app-text md:text-5xl">My CCA Activity</h2>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-app-muted">
             {currentUser?.name || 'Member'}, this view only shows your own event and competition registrations, approval status and attendance.
           </p>
         </div>
         <div className="rounded-2xl border border-app-border bg-app-surfaceSoft p-5">
-          <span className="block text-[0.78rem] font-extrabold uppercase tracking-wide text-app-muted">Attendance rate</span>
-          <strong className="mt-2 block font-mono text-5xl font-black text-app-cyan">{stats.attendance_rate}%</strong>
+          <span className="block text-[0.78rem] font-semibold uppercase tracking-wide text-app-muted">Attendance rate</span>
+          <strong className="mt-2 block font-mono text-5xl font-bold text-app-cyan">{stats.attendance_rate}%</strong>
           <small className="mt-1 block text-sm font-bold text-app-muted">
             {stats.attended_count} marked present from {stats.approved_registrations} approved signup(s)
           </small>
@@ -336,7 +336,7 @@ const MemberStatsDashboard = ({
               <article key={`${match.competition_title}-${match.round_number}-${match.table_number}-${match.opponent_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
-                    <strong className="block text-white">{match.competition_title}</strong>
+                    <strong className="block text-app-text">{match.competition_title}</strong>
                     <small className="text-app-muted">{match.category_name} - Round {match.round_number}, Table {match.table_number}</small>
                   </div>
                   <span className={match.outcome === 'Win' ? 'status-pill' : match.outcome === 'Loss' ? 'status-pill danger' : 'status-pill warning'}>{match.outcome}</span>
@@ -355,15 +355,15 @@ const MemberStatsDashboard = ({
               <article key={`${achievement.competition_title}-${achievement.category_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
-                    <strong className="block text-white">{achievement.competition_title}</strong>
+                    <strong className="block text-app-text">{achievement.competition_title}</strong>
                     <small className="text-app-muted">{achievement.category_name} - Round {achievement.round_number}</small>
                   </div>
                   <span className="status-pill">#{achievement.rank_position}</span>
                 </div>
                 <dl className="grid grid-cols-3 gap-3 text-sm">
-                  <div><dt className="font-extrabold text-app-muted">MMS</dt><dd className="m-0 font-black text-white">{achievement.mms}</dd></div>
-                  <div><dt className="font-extrabold text-app-muted">SOS</dt><dd className="m-0 font-black text-white">{achievement.sos}</dd></div>
-                  <div><dt className="font-extrabold text-app-muted">Record</dt><dd className="m-0 font-black text-white">{achievement.wins}-{achievement.losses}</dd></div>
+                  <div><dt className="font-semibold text-app-muted">MMS</dt><dd className="m-0 font-bold text-app-text">{achievement.mms}</dd></div>
+                  <div><dt className="font-semibold text-app-muted">SOS</dt><dd className="m-0 font-bold text-app-text">{achievement.sos}</dd></div>
+                  <div><dt className="font-semibold text-app-muted">Record</dt><dd className="m-0 font-bold text-app-text">{achievement.wins}-{achievement.losses}</dd></div>
                 </dl>
               </article>
             ))}
@@ -419,24 +419,24 @@ const MemberStatsDashboard = ({
               <article key={`${activity.activity_type}-${activity.title}-${activity.activity_date}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-xs font-black uppercase tracking-wide text-app-cyan">{activity.activity_type}</span>
-                    <h3 className="m-0 mt-1 text-base font-black text-white">{activity.title}</h3>
+                    <span className="text-xs font-bold uppercase tracking-wide text-app-cyan">{activity.activity_type}</span>
+                    <h3 className="m-0 mt-1 text-base font-bold text-app-text">{activity.title}</h3>
                   </div>
                   <span className="status-pill">{activity.status}</span>
                 </div>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <dt className="font-extrabold text-app-muted">Date</dt>
-                    <dd className="m-0 font-black text-white">{formatDate(activity.activity_date)}</dd>
+                    <dt className="font-semibold text-app-muted">Date</dt>
+                    <dd className="m-0 font-bold text-app-text">{formatDate(activity.activity_date)}</dd>
                   </div>
                   <div>
-                    <dt className="font-extrabold text-app-muted">Venue</dt>
-                    <dd className="m-0 font-black text-white">{activity.venue || '-'}</dd>
+                    <dt className="font-semibold text-app-muted">Venue</dt>
+                    <dd className="m-0 font-bold text-app-text">{activity.venue || '-'}</dd>
                   </div>
                   {activity.detail && (
                     <div className="col-span-2">
-                      <dt className="font-extrabold text-app-muted">Category</dt>
-                      <dd className="m-0 font-black text-white">{activity.detail}</dd>
+                      <dt className="font-semibold text-app-muted">Category</dt>
+                      <dd className="m-0 font-bold text-app-text">{activity.detail}</dd>
                     </div>
                   )}
                 </dl>
@@ -455,8 +455,8 @@ const MemberStatsDashboard = ({
 
 const MetricCard = ({ label, value, hint }: { label: string; value: number | string; hint: string }) => (
   <article className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel">
-    <span className="block text-[0.82rem] font-extrabold text-app-muted">{label}</span>
-    <strong className="mt-2 block font-mono text-3xl font-black text-app-cyan">{value}</strong>
+    <span className="block text-[0.82rem] font-semibold text-app-muted">{label}</span>
+    <strong className="mt-2 block font-mono text-3xl font-bold text-app-cyan">{value}</strong>
     <small className="mt-1 block text-[0.82rem] font-bold text-app-muted">{hint}</small>
   </article>
 );
@@ -477,24 +477,24 @@ const SignalCard = ({
     tone === 'warn' ? 'border-l-4 border-l-app-amber' : '',
     tone === 'danger' ? 'border-l-4 border-l-app-red' : '',
   ].join(' ')}>
-    <span className="block text-[0.82rem] font-extrabold text-app-muted">{label}</span>
-    <strong className="mt-2 block font-mono text-3xl font-black text-white">{value}</strong>
-    <small className="mt-1 block text-[0.82rem] font-extrabold text-app-muted">{detail}</small>
+    <span className="block text-[0.82rem] font-semibold text-app-muted">{label}</span>
+    <strong className="mt-2 block font-mono text-3xl font-bold text-app-text">{value}</strong>
+    <small className="mt-1 block text-[0.82rem] font-semibold text-app-muted">{detail}</small>
   </article>
 );
 
 const Insight = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
   <article className="rounded-2xl border border-app-border bg-app-surfaceSoft p-4">
-    <span className="block text-[0.78rem] font-extrabold uppercase tracking-wide text-app-muted">{label}</span>
-    <strong className="mt-2 block truncate text-base font-black text-app-cyan" title={value}>{value}</strong>
+    <span className="block text-[0.78rem] font-semibold uppercase tracking-wide text-app-muted">{label}</span>
+    <strong className="mt-2 block truncate text-base font-bold text-app-cyan" title={value}>{value}</strong>
     <small className="mt-1 block text-[0.78rem] font-bold text-app-muted">{detail}</small>
   </article>
 );
 
 const ChartHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-    <h3 className="m-0 text-base font-black text-app-cyan">{title}</h3>
-    <span className="max-w-xl text-left text-[0.82rem] font-extrabold leading-5 text-app-muted md:text-right">{subtitle}</span>
+    <h3 className="m-0 text-base font-bold text-app-cyan">{title}</h3>
+    <span className="max-w-xl text-left text-[0.82rem] font-semibold leading-5 text-app-muted md:text-right">{subtitle}</span>
   </div>
 );
 
@@ -507,7 +507,7 @@ const chartTextPlugin = {
     },
   },
   tooltip: {
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#342D32',
     borderColor: chartPalette.grid,
     borderWidth: 1,
     titleColor: chartPalette.text,
@@ -652,7 +652,7 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
         borderColor: chartPalette.green,
         backgroundColor: 'rgba(50, 215, 75, 0.16)',
         pointBackgroundColor: chartPalette.green,
-        pointBorderColor: '#121212',
+        pointBorderColor: '#FCF8F8',
         pointRadius: 5,
         tension: 0.35,
         fill: true,
@@ -663,7 +663,7 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
         borderColor: chartPalette.cyan,
         backgroundColor: 'rgba(0, 229, 255, 0.08)',
         pointBackgroundColor: chartPalette.cyan,
-        pointBorderColor: '#121212',
+        pointBorderColor: '#FCF8F8',
         pointRadius: 4,
         tension: 0.24,
         fill: false,
@@ -759,7 +759,7 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
     datasets: [{
       data: roleItems.map((item) => item.total),
       backgroundColor: [chartPalette.cyan, chartPalette.green, chartPalette.amber, chartPalette.blue, chartPalette.purple, chartPalette.red],
-      borderColor: '#1e1e1e',
+      borderColor: '#342D32',
       borderWidth: 2,
     }],
   };
@@ -783,10 +783,10 @@ const AnalyticsDashboard = ({ stats }: { stats: DashboardStats }) => {
 
   return (
     <section className="grid gap-4" aria-label="Tournament analytics">
-      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.22),transparent_28%),linear-gradient(135deg,#1e1e1e,#121212)] p-6 shadow-panel xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
+      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.22),transparent_28%),linear-gradient(135deg,#342D32,#FCF8F8)] p-6 shadow-panel xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
         <div>
-          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-app-cyan">Deep analytics</p>
-          <h2 className="m-0 text-3xl font-black tracking-normal text-white md:text-5xl">Competition Intelligence</h2>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Deep analytics</p>
+          <h2 className="m-0 text-3xl font-bold tracking-normal text-app-text md:text-5xl">Competition Intelligence</h2>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-app-muted">
             Signup requests, approval workload, attendance leakage and capacity pressure are aggregated directly from the event and competition tables.
           </p>

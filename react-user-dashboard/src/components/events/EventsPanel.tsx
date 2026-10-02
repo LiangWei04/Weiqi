@@ -33,7 +33,7 @@ const EventsPanel = ({
   onChanged: (message: string) => void;
 }) => {
   const [editingEvent, setEditingEvent] = React.useState<EventItem | null>(null);
-  const [showArchive, setShowArchive] = React.useState(false);
+  const [showArchive, setShowArchive] = React.useState(true);
   const [commentEvent, setCommentEvent] = React.useState<EventItem | null>(null);
   const [comments, setComments] = React.useState<EventComment[]>([]);
   const [commentText, setCommentText] = React.useState('');
@@ -161,6 +161,7 @@ const EventsPanel = ({
             <div><dt>Attendance</dt><dd>{eventItem.attended}/{eventItem.registered} ({attendanceRate}%)</dd></div>
           )}
         </dl>
+        <progress className="event-capacity" aria-label={`${eventItem.title} places filled`} max={eventItem.capacity || 1} value={activeSignups} />
         {!demoMode && <div className="event-social-row">
           {eventReactionOptions.map((reaction) => (
             <button
@@ -208,8 +209,7 @@ const EventsPanel = ({
     <section className="panel large-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">CCA programme</p>
-          <h2>Events</h2>
+          <h2>CCA programme</h2>
         </div>
         <div className="row-actions">
           <NavLink to="/my-events" className="secondary-action compact">
@@ -243,9 +243,9 @@ const EventsPanel = ({
             </button>
           </div>
           {showArchive && (
-            <div className="event-grid">
-              {archivedEvents.map(renderEventCard)}
-            </div>
+            <div className="archived-events-table"><table><thead><tr><th>Event name</th><th>Date</th><th>Venue</th><th>Signups</th><th>Present</th><th>Status</th></tr></thead><tbody>
+              {archivedEvents.map(item => <tr key={item.id}><td><strong>{item.title}</strong><small className="muted-line">{item.description}</small></td><td>{formatDate(item.event_date)}</td><td>{item.venue}</td><td>{item.registered}/{item.capacity}</td><td>{item.attended}/{item.registered}</td><td><span className="status-pill">Archived</span></td></tr>)}
+            </tbody></table></div>
           )}
         </div>
       )}

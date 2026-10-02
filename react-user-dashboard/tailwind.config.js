@@ -5,19 +5,19 @@ export default {
     extend: {
       colors: {
         app: {
-          bg: '#121212',
-          bgDeep: '#0b0f11',
-          surface: '#1e1e1e',
-          surfaceSoft: '#181818',
-          border: '#2c2c2e',
-          cyan: '#00e5ff',
-          green: '#32d74b',
-          red: '#ff453a',
-          amber: '#ffd60a',
+          bg: '#FCF8F8',
+          bgDeep: '#FCF8F8',
+          surface: '#FFFFFF',
+          surfaceSoft: '#FCF8F8',
+          border: '#EADDDD',
+          cyan: '#A84466',
+          green: '#4C7666',
+          red: '#B63E57',
+          amber: '#80555D',
           blue: '#2563eb',
-          text: '#ffffff',
-          muted: '#98989d',
-          ink: '#07142f',
+          text: '#342D32',
+          muted: '#76686F',
+          ink: '#342D32',
         },
       },
       fontFamily: {
@@ -25,8 +25,8 @@ export default {
         mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
       },
       boxShadow: {
-        panel: '0 18px 44px rgba(0, 0, 0, 0.22)',
-        glow: '0 0 0 1px rgba(0, 229, 255, 0.2), 0 24px 70px rgba(0, 0, 0, 0.45)',
+        panel: 'none',
+        glow: '0 12px 35px rgba(52,45,50,.12)',
       },
       borderRadius: {
         panel: '16px',

@@ -40,13 +40,15 @@ export default function DemoGuide() {
     </div>
     {confirmReset && <div role="group" aria-label="Confirm reset" className="demo-reset"><p>Discard your changes and start with a fresh club?</p><button className="primary-action compact" disabled={busy} onClick={() => void change(true)}>Yes, reset demo</button><button className="secondary-action compact" disabled={busy} onClick={() => setConfirmReset(false)}>Keep exploring</button></div>}
     {error && <p role="alert">{error}</p>}
-    <h2>Explore a fictional Weiqi club</h2>
+    <details key={location.pathname} className="demo-walkthrough" open={location.pathname === '/dashboard'}>
+    <summary><h2>Explore a fictional Weiqi club</h2></summary>
     <p>Manage registrations, resolve attendance requests, and update tournament results. Your changes stay in your demo session.</p>
     <div className="demo-scenarios">
       <button onClick={() => window.location.assign(`/competitions?demo=tournament&competition=${session?.records.activeCompetition || ''}`)} disabled={!session}><strong>01 · Run a tournament</strong><span>Open the cup engine. Finish round 2, then generate round 3.</span><small>{p?.tournament ? 'Round 2 results complete' : 'One match awaits a result'} · Organiser</small></button>
       <button onClick={() => navigate('/events?demo=signup')}><strong>02 · Manage a signup</strong><span>Join the workshop as Member. Approve it as Organiser in Members.</span><small>Member signup: {p?.signup || 'Loading…'}</small></button>
       <button onClick={() => navigate('/attendance?demo=attendance')}><strong>03 · Resolve an attendance request</strong><span>Review Demo Member’s missed check-in as Organiser.</span><small>Decision: {p?.attendance || 'Loading…'}{p?.reviewedAt ? ` · ${new Date(p.reviewedAt).toLocaleString()}` : ''}</small></button>
     </div>
+    </details>
     {session?.persona === 'member' && location.pathname === '/attendance' && <p>Switch to Organiser above to review attendance. Members cannot approve requests.</p>}
   </section>;
 }

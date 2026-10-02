@@ -7,6 +7,7 @@ import DashboardPage from './components/DashboardPage';
 import VerifyEmailPage from './components/VerifyEmailPage';
 import OAuthCallbackPage from './components/OAuthCallbackPage';
 import './App.css';
+import './rose-theme.css';
 
 function App() {
   return (

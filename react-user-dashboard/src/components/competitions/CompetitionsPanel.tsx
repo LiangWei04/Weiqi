@@ -138,7 +138,7 @@ const CompetitionsPanel = ({
   createTo?: string;
   showDraftLink?: boolean;
 }) => {
-  const [showArchive, setShowArchive] = React.useState(false);
+  const [showArchive, setShowArchive] = React.useState(true);
 
   const renderCompetitionCard = (competition: Competition) => {
     const fillRate = competition.total_capacity === 0 ? 0 : Math.round((competition.registration_count / competition.total_capacity) * 100);
@@ -148,6 +148,7 @@ const CompetitionsPanel = ({
           'event-card',
           selectedId === competition.id ? 'selected-card' : '',
           competition.is_archived ? 'archived-card' : '',
+          competition.status === 'In Progress' ? 'in-progress' : '',
         ].join(' ')}
         key={competition.id}
       >

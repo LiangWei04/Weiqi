@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
 import type { EventRegistration, Registration } from '../../types/dashboard';
+import EditModal from '../shared/EditModal';
 import ConfirmDeleteDialog from '../shared/ConfirmDeleteDialog';
 import PaginationControls from '../shared/PaginationControls';
 import { paginate } from '../../utils/pagination';
@@ -219,8 +220,8 @@ const MemberParticipationPanel = ({
 
   const toggleMember = (key: string) => {
     setExpandedMembers((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
+      const next = new Set<string>();
+      if (current.has(key)) {
         next.delete(key);
       } else {
         next.add(key);
@@ -297,7 +298,7 @@ const MemberParticipationPanel = ({
           const visibleItems = getVisibleItems(member);
           return (
           <article className="member-card" key={member.key}>
-            <button type="button" className="member-card-head member-card-toggle" onClick={() => toggleMember(member.key)} aria-expanded={isExpanded}>
+            <button type="button" className="member-card-head member-card-toggle" onClick={() => toggleMember(member.key)} aria-haspopup="dialog" aria-expanded={isExpanded}>
               <span>
                 <strong>{member.name}</strong>
                 <small>{member.email} - {visibleItems.length} matching signup(s)</small>
@@ -310,7 +311,23 @@ const MemberParticipationPanel = ({
               </dl>
             </button>
             {isExpanded && (
-              <div className="member-registration-list">
+              <EditModal title={member.name} onClose={() => toggleMember(member.key)}>
+                <p className="muted-line">{member.email}</p>
+                <div className="member-profile"><dl className="detail-grid compact-details">
+                  <div><dt>Username</dt><dd>{member.items[0]?.profile.username || '-'}</dd></div>
+                  <div><dt>Role</dt><dd>{member.items[0]?.profile.role || '-'}</dd></div>
+                  <div><dt>School</dt><dd>{member.items[0]?.profile.school || '-'}</dd></div>
+                  <div><dt>Rank</dt><dd>{formatRank(member.items[0]?.profile.rankType, member.items[0]?.profile.rankValue)}</dd></div>
+                </dl></div>
+                <div className="member-summary-grid">
+                  <MetricCard label="Total signups" value={member.total} hint="all activities" />
+                  <MetricCard label="Approved" value={member.registered} hint="registered" />
+                  <MetricCard label="Pending" value={member.pending} hint="awaiting review" />
+                  <MetricCard label="Marked present" value={member.attended} hint="attendance records" />
+                </div>
+                <h3>Signups &amp; attendance</h3>
+                {demoMode && <p className="muted-line">Attendance controls are read-only in the public demo.</p>}
+                <div className="member-registration-list">
                 {visibleItems.map((item) => (
                   <div className="member-registration-row" key={`${member.key}-${item.type}-${item.id}`}>
                     <span>
@@ -358,21 +375,14 @@ const MemberParticipationPanel = ({
                       })()
                     )}
                     {canDelete && (
-                      <button type="button" className="danger-action compact" onClick={() => setRemoveTarget(item)}>
+                      <button type="button" className="danger-action compact" onClick={() => { toggleMember(member.key); setRemoveTarget(item); }}>
                         Remove
                       </button>
                     )}
-                    <div className="member-registration-details">
-                      <dl className="detail-grid compact-details">
-                        <div><dt>Username</dt><dd>{item.profile.username || '-'}</dd></div>
-                        <div><dt>Role</dt><dd>{item.profile.role || '-'}</dd></div>
-                        <div><dt>School</dt><dd>{item.profile.school || '-'}</dd></div>
-                        <div><dt>Rank</dt><dd>{formatRank(item.profile.rankType, item.profile.rankValue)}</dd></div>
-                      </dl>
-                    </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              </EditModal>
             )}
           </article>
         );

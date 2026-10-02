@@ -3,6 +3,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
 import type { AttendanceChangeRequest, EventRegistration, Registration } from '../../types/dashboard';
+import EditModal from '../shared/EditModal';
 import PaginationControls from '../shared/PaginationControls';
 import { paginate } from '../../utils/pagination';
 import { formatDate } from '../../utils/formatters';
@@ -422,16 +423,8 @@ const AttendancePanel = ({
         </div>
       </div>
       {selectedAttendanceActivity && (
-        <div className="edit-modal-backdrop" role="presentation">
-          <section className="edit-modal attendance-modal" role="dialog" aria-modal="true" aria-label={`${selectedAttendanceActivity.detail} attendance`}>
-            <div className="edit-modal-head">
-              <div>
-                <p className="eyebrow">{selectedAttendanceActivity.type} attendance</p>
-                <h3>{selectedAttendanceActivity.detail}</h3>
-                <small>{formatDate(selectedAttendanceActivity.activityDate)}</small>
-              </div>
-              <button type="button" className="secondary-action compact" onClick={() => setSelectedAttendanceActivityKey(null)}>Close</button>
-            </div>
+        <EditModal title={`${selectedAttendanceActivity.detail} attendance`} onClose={() => setSelectedAttendanceActivityKey(null)}>
+          <p className="muted-line">{selectedAttendanceActivity.type} · {formatDate(selectedAttendanceActivity.activityDate)}</p>
             <div className="attendance-bulk-bar">
               <div>
                 <strong>{selectedAttendanceActivity.present}/{selectedAttendanceActivity.rows.length} present</strong>
@@ -486,8 +479,7 @@ const AttendancePanel = ({
                 );
               })}
             </div>
-          </section>
-        </div>
+        </EditModal>
       )}
       {requestTarget && (
         <div className="dialog-backdrop" role="presentation">

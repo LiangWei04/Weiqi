@@ -14,7 +14,7 @@ export default function DemoEntry() {
     finally { setBusy(false); }
   };
   return <main className="auth-page"><section className="auth-panel" aria-labelledby="demo-title">
-    <div className="auth-brand"><span>TourneysHub</span><strong>Club operations, from signup to standings</strong></div>
+    <div className="auth-brand"><span>TourneyHub</span><strong>Club operations, from signup to standings</strong></div>
     <div className="auth-card">
       <p className="eyebrow">Interactive coursework demo</p>
       <h1 id="demo-title">A club ready to explore.</h1>

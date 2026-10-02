@@ -6,19 +6,25 @@ interface EditModalProps {
   onClose: () => void;
 }
 
-const EditModal = ({ title, children, onClose }: EditModalProps) => (
-  <div className="edit-modal-backdrop" role="presentation">
-    <div className="edit-modal" role="dialog" aria-modal="true" aria-label={title}>
+const EditModal = ({ title, children, onClose }: EditModalProps) => {
+  const dialogRef = React.useRef<HTMLDialogElement>(null);
+  React.useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => { dialog?.close(); previous?.focus(); };
+  }, []);
+  return (
+    <dialog ref={dialogRef} className="edit-modal native-modal" aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
       <div className="edit-modal-head">
         <div>
-          <p className="eyebrow">Manage activity</p>
           <h3>{title}</h3>
         </div>
         <button type="button" className="secondary-action compact" onClick={onClose}>Close</button>
       </div>
       {children}
-    </div>
-  </div>
-);
+    </dialog>
+  );
+};
 
 export default EditModal;
