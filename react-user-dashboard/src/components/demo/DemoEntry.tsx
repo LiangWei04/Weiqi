@@ -18,7 +18,7 @@ export default function DemoEntry() {
       <span className="demo-entry-logo">TourneyHub</span>
       <div className="demo-entry-story">
         <p className="eyebrow">Your club. Your next move.</p>
-        <strong>A little strategy.<br />A lot of possibility.</strong>
+        <strong>A little strategy.<br />A lot of <em>possibility.</em></strong>
         <p>Bring people together, on and off the board.</p>
       </div>
       <p className="demo-entry-caption">A fictional Weiqi club. Real working features.</p>
@@ -40,7 +40,7 @@ export default function DemoEntry() {
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       <button className="primary-action" disabled={busy} onClick={start}>{busy ? 'Preparing your demo…' : 'Try interactive demo'}</button>
       <p className="demo-entry-wait" role="status">{busy ? 'Setting up your club. Keep this page open.' : 'Free hosting may take about a minute to wake up.'}</p>
-      <a href={portfolioUrl}>View project walkthrough</a>
+      <a href={portfolioUrl}>View project walkthrough <span aria-hidden="true">→</span></a>
       </div>
     </div>
   </section></main>;
