@@ -68,6 +68,12 @@ test('personal dashboard returns only retained cards and keeps persona data scop
     'recent_matches', 'competition_achievements', 'upcoming_activities',
   ].sort());
   assert.ok(organiser.events_created > 0);
+  assert.ok(organiser.competition_matches_played >= 9);
+  assert.ok(organiser.competition_win_rate > 0 && organiser.competition_win_rate < 100);
+  assert.equal(organiser.competition_achievements.length,3);
+  assert.ok(organiser.monthly_activity.length >= 6);
+  assert.ok(organiser.attended_count > 0 && organiser.attended_count < organiser.approved_registrations);
+  assert.equal(organiser.upcoming_activities.length,2);
   const member = (await api('/demo/persona',a.token,'POST',{persona:'member'})).data;
   const response = await api('/dashboard/member-stats',member.token);
   assert.equal(response.status,200);
@@ -76,6 +82,16 @@ test('personal dashboard returns only retained cards and keeps persona data scop
   assert.ok(response.data.recent_matches.length > 0);
   assert.ok(response.data.monthly_activity.length > 0);
   assert.equal(response.data.competition_win_rate,Math.round(response.data.competition_match_wins / response.data.competition_matches_played * 100));
+  assert.equal(response.data.competition_achievements.length,4);
+  assert.ok(response.data.competition_win_rate < 100);
+  const competitions = (await api('/competitions',a.token)).data;
+  for (const competition of competitions.filter(item => item.status === 'Completed')) {
+    const tournament = (await api(`/competitions/${competition.id}/tournament`,a.token)).data;
+    const category = tournament.categories[0];
+    const standing = category.standings.find(item => item.user_id === a.userId);
+    const saved = organiser.competition_achievements.find(item => item.competition_title === competition.title);
+    assert.equal(saved.rank_position,standing.rank_position,'Seeded achievement must match calculated standings');
+  }
 });
 test('attendance decision updates underlying registration and preserves history',async () => {
   assert.equal((await api(`/attendance-requests/${a.records.attendanceRequest}/approve`,a.token,'PUT',{})).status,200);

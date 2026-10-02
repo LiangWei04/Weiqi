@@ -894,13 +894,13 @@ module.exports.updateMatchResult = async (data) => {
   return result.rows[0];
 };
 
-module.exports.recordRankingSnapshot = async (data) => {
-  const rows = await selectTournamentRows(data.competition_id, data.category_id);
+module.exports.recordRankingSnapshot = async (data, dbClient = pool) => {
+  const rows = await selectTournamentRows(data.competition_id, data.category_id, dbClient);
   const standings = buildStandings(rows.participants, rows.matches);
   const latestRound = rows.matches.reduce((maxRound, match) => Math.max(maxRound, Number(match.round_number || 0)), 0);
 
   for (const standing of standings) {
-    await pool.query(
+    await dbClient.query(
       `
         INSERT INTO competition_ranking_records (
           competition_id,

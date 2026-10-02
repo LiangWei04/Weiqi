@@ -10,7 +10,7 @@ test('My Activity uses live personal data and fits desktop and mobile', async ({
   await page.getByRole('button', { name: 'My Activity', exact: true }).click();
   const activity = page.getByRole('region', { name: 'My Activity', exact: true });
   await expect(activity.locator('.activity-metric').filter({ hasText: 'Managed activities' }).locator('strong')).toHaveText(String(organiser.events_created + organiser.competitions_organized));
-  await expect(activity.getByRole('heading')).toHaveText(['Recent match history', 'Achievement records', 'Participation trend', 'Attendance', 'Upcoming for me']);
+  await expect(activity.getByRole('heading', { level: 2 })).toHaveText(['Recent match history', 'Achievement records', 'Participation trend', 'Attendance', 'Upcoming for me']);
   await expect(activity.getByText('Opponent Record', { exact: true })).toHaveCount(0);
   await expect(activity.locator('.activity-metric.activity-highlight')).toHaveCSS('border-top-color', 'rgb(237, 117, 151)');
   await expect(activity.locator('.activity-metric.activity-highlight')).toHaveCSS('background-color', 'rgb(255, 247, 248)');
