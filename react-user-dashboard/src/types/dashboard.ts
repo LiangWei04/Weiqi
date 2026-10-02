@@ -294,15 +294,6 @@ export interface MemberTrendPoint {
   total: number;
 }
 
-export interface MemberOpponentRecord {
-  opponent_id: number;
-  opponent_name: string;
-  played: number;
-  wins: number;
-  losses: number;
-  last_played: string | null;
-}
-
 export interface MemberRecentMatch {
   competition_title: string;
   category_name: string;
@@ -318,66 +309,20 @@ export interface MemberCompetitionAchievement {
   category_name: string;
   round_number: number;
   rank_position: number;
-  mms: number;
-  sos: number;
-  sosos: number;
-  wins: number;
-  losses: number;
-}
-
-export interface ManagedActivityLoadPoint {
-  activity_type: string;
-  total_signups: number;
-  pending: number;
-  attended: number;
 }
 
 export interface MemberStats {
-  total_registrations: number;
-  event_registrations: number;
-  competition_registrations: number;
-  approved_event_registrations: number;
-  approved_competition_registrations: number;
   approved_registrations: number;
-  pending_registrations: number;
-  waitlisted_registrations: number;
-  rejected_registrations: number;
   attended_count: number;
-  attended_event_count: number;
-  attended_competition_count: number;
   attendance_rate: number;
-  upcoming_count: number;
   competition_matches_played: number;
   competition_match_wins: number;
-  competition_match_losses: number;
-  competition_byes: number;
   competition_win_rate: number;
   first_place_count: number;
-  second_place_count: number;
-  third_place_count: number;
-  top5_count: number;
   top10_count: number;
-  best_finish: number | null;
   events_created: number;
   competitions_organized: number;
-  rounds_generated: number;
-  comments_posted: number;
-  reactions_made: number;
-  attendance_requests_made: number;
-  attendance_requests_reviewed: number;
-  managed_event_signups: number;
-  managed_event_pending: number;
-  managed_event_attended: number;
-  managed_competition_signups: number;
-  managed_competition_pending: number;
-  managed_competition_attended: number;
-  status_breakdown: NamedTotal[];
-  type_breakdown: NamedTotal[];
   monthly_activity: MemberTrendPoint[];
-  exco_contribution_breakdown: NamedTotal[];
-  managed_activity_load: ManagedActivityLoadPoint[];
-  competition_result_breakdown: NamedTotal[];
-  opponent_records: MemberOpponentRecord[];
   recent_matches: MemberRecentMatch[];
   competition_achievements: MemberCompetitionAchievement[];
   upcoming_activities: MemberActivityStat[];

@@ -1,0 +1,32 @@
+import { test, expect } from '@playwright/test';
+
+test('My Activity uses live personal data and fits desktop and mobile', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  const loaded = page.waitForResponse(response => response.url().endsWith('/dashboard/member-stats') && response.status() === 200);
+  await page.getByRole('button', { name: 'Try interactive demo' }).click();
+  const organiser = await (await loaded).json();
+  await page.getByRole('button', { name: 'My Activity', exact: true }).click();
+  const activity = page.getByRole('region', { name: 'My Activity', exact: true });
+  await expect(activity.locator('.activity-metric').filter({ hasText: 'Managed activities' }).locator('strong')).toHaveText(String(organiser.events_created + organiser.competitions_organized));
+  await expect(activity.getByRole('heading')).toHaveText(['Recent match history', 'Achievement records', 'Participation trend', 'Attendance', 'Upcoming for me']);
+  await expect(activity.getByText('Opponent Record', { exact: true })).toHaveCount(0);
+  await expect(activity.locator('.activity-metric.activity-highlight')).toHaveCSS('border-top-color', 'rgb(237, 117, 151)');
+  await expect(activity.locator('.activity-metric.activity-highlight')).toHaveCSS('background-color', 'rgb(255, 247, 248)');
+  await page.screenshot({ path: testInfo.outputPath('activity-organiser.png'), fullPage: true });
+  const switched = page.waitForResponse(response => response.url().endsWith('/dashboard/member-stats') && response.status() === 200);
+  await page.getByRole('combobox', { name: 'Demo persona' }).selectOption('member');
+  const member = await (await switched).json();
+  await expect(activity.getByText('Managed activities', { exact: true })).toHaveCount(0);
+  await expect(activity.locator('.activity-metric').filter({ hasText: 'Match win rate' }).locator('strong')).toHaveText(`${member.competition_win_rate}%`);
+  await expect(activity.locator('tbody tr')).toHaveCount(member.recent_matches.length);
+  await page.screenshot({ path: testInfo.outputPath('activity-member.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('activity-mobile.png'), fullPage: true });
+  await activity.getByRole('link', { name: 'Review attendance' }).click();
+  await expect(page).toHaveURL(/\/my-events$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'My Events' })).toBeVisible();
+  expect(errors).toEqual([]);
+});

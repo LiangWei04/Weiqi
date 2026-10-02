@@ -13,7 +13,8 @@ import {
 import type { ChartData, ChartOptions } from 'chart.js';
 import { Bar, Bubble, Doughnut, Line } from 'react-chartjs-2';
 import type { CurrentUser, DashboardStats, MemberStats, NamedTotal } from '../../types/dashboard';
-import { formatDate, formatMonth, formatShortDate } from '../../utils/formatters';
+import { Link } from 'react-router-dom';
+import { formatDateTime, formatMonth, formatShortDate } from '../../utils/formatters';
 
 const chartPalette = {
   cyan: '#A84466',
@@ -83,371 +84,87 @@ const MemberStatsDashboard = ({
   currentUser: CurrentUser | null;
 }) => {
   if (!stats) {
-    return (
-      <section className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-panel">
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
-        <h2 className="m-0 text-2xl font-bold text-app-text">Loading your activity stats</h2>
-      </section>
-    );
+    return <section className="activity-panel" role="status">Loading your activity…</section>;
   }
 
-  const statusItems = stats.status_breakdown.length > 0
-    ? stats.status_breakdown
-    : [{ status: 'No registrations yet', total: 0 }];
-  const typeItems = stats.type_breakdown.length > 0
-    ? stats.type_breakdown
-    : [{ name: 'No activity yet', total: 0 }];
-  const missedApproved = Math.max(stats.approved_registrations - stats.attended_count, 0);
-  const trendItems = stats.monthly_activity.length > 0
-    ? stats.monthly_activity
-    : [{ month: new Date().toISOString(), total: 0 }];
-  const statusData: ChartData<'doughnut'> = {
-    labels: statusItems.map((item) => item.status || 'Unknown'),
-    datasets: [{
-      data: statusItems.map((item) => item.total),
-      backgroundColor: [chartPalette.green, chartPalette.amber, chartPalette.red, chartPalette.blue, chartPalette.purple],
-      borderColor: '#342D32',
-      borderWidth: 2,
-    }],
-  };
-  const typeData: ChartData<'bar'> = {
-    labels: typeItems.map((item) => item.name || 'Unknown'),
-    datasets: [{
-      label: 'Registrations',
-      data: typeItems.map((item) => item.total),
-      backgroundColor: [chartPalette.cyan, chartPalette.green],
-      borderRadius: 8,
-    }],
-  };
-  const attendanceData: ChartData<'doughnut'> = {
-    labels: ['Present', 'Not marked'],
-    datasets: [{
-      data: [stats.attended_count, missedApproved],
-      backgroundColor: [chartPalette.green, 'rgba(255,255,255,0.12)'],
-      borderColor: '#342D32',
-      borderWidth: 2,
-    }],
-  };
-  const attendanceByTypeData: ChartData<'bar'> = {
-    labels: ['Events', 'Competitions'],
-    datasets: [
-      {
-        label: 'Approved signups',
-        data: [stats.approved_event_registrations, stats.approved_competition_registrations],
-        backgroundColor: 'rgba(0, 229, 255, 0.28)',
-        borderColor: chartPalette.cyan,
-        borderWidth: 1,
-        borderRadius: 8,
-      },
-      {
-        label: 'Marked present',
-        data: [stats.attended_event_count, stats.attended_competition_count],
-        backgroundColor: chartPalette.green,
-        borderRadius: 8,
-      },
-    ],
-  };
-  const trendData: ChartData<'line'> = {
-    labels: trendItems.map((item) => formatMonth(item.month)),
-    datasets: [{
-      label: 'Signups',
-      data: trendItems.map((item) => item.total),
-      borderColor: chartPalette.cyan,
-      backgroundColor: 'rgba(0, 229, 255, 0.14)',
-      pointBackgroundColor: chartPalette.cyan,
-      pointBorderColor: '#FCF8F8',
-      pointRadius: 5,
-      tension: 0.35,
-      fill: true,
-    }],
-  };
-  const resultItems = stats.competition_result_breakdown.filter((item) => item.total > 0);
-  const competitionResultData: ChartData<'doughnut'> = {
-    labels: resultItems.length > 0 ? resultItems.map((item) => item.status || 'Unknown') : ['No results'],
-    datasets: [{
-      data: resultItems.length > 0 ? resultItems.map((item) => item.total) : [1],
-      backgroundColor: resultItems.length > 0 ? [chartPalette.green, chartPalette.red, chartPalette.blue] : ['rgba(255,255,255,0.12)'],
-      borderColor: '#342D32',
-      borderWidth: 2,
-    }],
-  };
-  const opponentData: ChartData<'bar'> = {
-    labels: stats.opponent_records.slice(0, 6).map((item) => item.opponent_name),
-    datasets: [
-      {
-        label: 'Wins',
-        data: stats.opponent_records.slice(0, 6).map((item) => item.wins),
-        backgroundColor: chartPalette.green,
-        borderRadius: 8,
-      },
-      {
-        label: 'Losses',
-        data: stats.opponent_records.slice(0, 6).map((item) => item.losses),
-        backgroundColor: chartPalette.red,
-        borderRadius: 8,
-      },
-    ],
-  };
-  const achievementData: ChartData<'bar'> = {
-    labels: ['1st', '2nd', '3rd', 'Top 5', 'Top 10'],
-    datasets: [{
-      label: 'Finishes',
-      data: [
-        stats.first_place_count,
-        stats.second_place_count,
-        stats.third_place_count,
-        stats.top5_count,
-        stats.top10_count,
-      ],
-      backgroundColor: [chartPalette.amber, chartPalette.cyan, chartPalette.green, chartPalette.blue, chartPalette.purple],
-      borderRadius: 8,
-    }],
-  };
-  const excoRoles = new Set(['Captain', 'Vice-Captain', 'Secretary']);
-  const isExco = Boolean(currentUser?.role && excoRoles.has(currentUser.role));
-  const contributionItems = stats.exco_contribution_breakdown.filter((item) => item.total > 0);
-  const contributionData: ChartData<'doughnut'> = {
-    labels: contributionItems.length > 0 ? contributionItems.map((item) => item.name || 'Contribution') : ['No management actions'],
-    datasets: [{
-      data: contributionItems.length > 0 ? contributionItems.map((item) => item.total) : [1],
-      backgroundColor: contributionItems.length > 0
-        ? [chartPalette.cyan, chartPalette.green, chartPalette.amber, chartPalette.blue, chartPalette.purple, chartPalette.red]
-        : ['rgba(255,255,255,0.12)'],
-      borderColor: '#342D32',
-      borderWidth: 2,
-    }],
-  };
-  const managementLoadData: ChartData<'bar'> = {
-    labels: stats.managed_activity_load.map((item) => item.activity_type),
-    datasets: [
-      {
-        label: 'Total signups',
-        data: stats.managed_activity_load.map((item) => item.total_signups),
-        backgroundColor: 'rgba(0, 229, 255, 0.28)',
-        borderColor: chartPalette.cyan,
-        borderWidth: 1,
-        borderRadius: 8,
-      },
-      {
-        label: 'Pending',
-        data: stats.managed_activity_load.map((item) => item.pending),
-        backgroundColor: chartPalette.amber,
-        borderRadius: 8,
-      },
-      {
-        label: 'Attended',
-        data: stats.managed_activity_load.map((item) => item.attended),
-        backgroundColor: chartPalette.green,
-        borderRadius: 8,
-      },
-    ],
-  };
-  const managedTotalSignups = stats.managed_event_signups + stats.managed_competition_signups;
-  const managedPending = stats.managed_event_pending + stats.managed_competition_pending;
-  const managedAttended = stats.managed_event_attended + stats.managed_competition_attended;
-  const managedAttendanceRate = managedTotalSignups === 0 ? 0 : Math.round((managedAttended / managedTotalSignups) * 100);
+  const isExco = ['Captain', 'Vice-Captain', 'Secretary'].includes(currentUser?.role || '');
+  const notMarked = Math.max(stats.approved_registrations - stats.attended_count, 0);
+  const trendMax = Math.max(1, ...stats.monthly_activity.map((item) => item.total));
 
   return (
-    <section className="grid gap-4" aria-label="Member dashboard">
-      <div className="grid items-start gap-5 rounded-2xl border border-app-border bg-[radial-gradient(circle_at_78%_18%,rgba(0,229,255,0.18),transparent_28%),linear-gradient(135deg,#342D32,#FCF8F8)] p-6 shadow-panel lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-app-cyan">Personal dashboard</p>
-          <h2 className="m-0 text-3xl font-bold text-app-text md:text-5xl">My CCA Activity</h2>
-          <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-app-muted">
-            {currentUser?.name || 'Member'}, this view only shows your own event and competition registrations, approval status and attendance.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-app-border bg-app-surfaceSoft p-5">
-          <span className="block text-[0.78rem] font-semibold uppercase tracking-wide text-app-muted">Attendance rate</span>
-          <strong className="mt-2 block font-mono text-5xl font-bold text-app-cyan">{stats.attendance_rate}%</strong>
-          <small className="mt-1 block text-sm font-bold text-app-muted">
-            {stats.attended_count} marked present from {stats.approved_registrations} approved signup(s)
-          </small>
-        </div>
+    <section className="personal-activity" aria-label="My Activity">
+      <div className={`activity-summary ${isExco ? '' : 'activity-summary-member'}`}>
+        <article className="activity-metric">
+          <span>Match win rate</span>
+          <strong>{stats.competition_matches_played ? `${stats.competition_win_rate}%` : '—'}</strong>
+          <small>{stats.competition_match_wins} wins from {stats.competition_matches_played} decided games</small>
+        </article>
+        <article className="activity-metric activity-highlight">
+          <span>Achievements</span><strong>{stats.top10_count}</strong>
+          <small>Top-10 standings · {stats.first_place_count} in first place</small>
+        </article>
+        {isExco && <article className="activity-metric">
+          <span>Managed activities</span><strong>{stats.events_created + stats.competitions_organized}</strong>
+          <small>{stats.events_created} events · {stats.competitions_organized} competitions</small>
+        </article>}
       </div>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="My Signups" value={stats.total_registrations} hint={`${stats.upcoming_count} upcoming`} />
-        <MetricCard label="Events" value={stats.event_registrations} hint="event registrations" />
-        <MetricCard label="Competitions" value={stats.competition_registrations} hint="competition entries" />
-        <MetricCard label="Pending" value={stats.pending_registrations} hint="waiting for approval" />
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Match Win Rate" value={`${stats.competition_win_rate}%`} hint={`${stats.competition_match_wins}/${stats.competition_matches_played} decided games won`} />
-        <MetricCard label="Match Record" value={`${stats.competition_match_wins}-${stats.competition_match_losses}`} hint={`${stats.competition_byes} bye win(s)`} />
-        <MetricCard label="Best Finish" value={stats.best_finish ? `#${stats.best_finish}` : '-'} hint="best latest standing" />
-        <MetricCard label="Achievements" value={stats.top10_count} hint={`${stats.first_place_count} first, ${stats.top5_count} top 5`} />
-      </section>
-
-      {isExco && (
-        <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Managed Activities" value={stats.events_created + stats.competitions_organized} hint={`${stats.events_created} events, ${stats.competitions_organized} competitions`} />
-            <MetricCard label="Managed Signups" value={managedTotalSignups} hint={`${managedPending} waiting for action`} />
-            <MetricCard label="Managed Attendance" value={`${managedAttendanceRate}%`} hint={`${managedAttended} marked present`} />
-            <MetricCard label="Tournament Ops" value={stats.rounds_generated} hint={`${stats.attendance_requests_reviewed} attendance reviews`} />
-          </section>
-
-          <div className="grid gap-4 xl:grid-cols-12">
-            <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-              <ChartHeader title="My contribution as an Exco" subtitle="Management actions by type." />
-              <div className="h-[280px]">
-                <Doughnut data={contributionData} options={doughnutOptions} />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-8">
-              <ChartHeader title="Activities I Manage" subtitle="Signup load, pending queue and attendance outcomes for events or competitions under this account." />
-              <div className="h-[280px]">
-                <Bar data={managementLoadData} options={barOptions} />
-              </div>
-            </section>
-          </div>
-        </>
-      )}
-
-      <div className="grid gap-4 xl:grid-cols-12">
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Competition Results" subtitle="Win, loss and bye outcomes from recorded pairings." />
-          <div className="h-[280px]">
-            <Doughnut data={competitionResultData} options={doughnutOptions} />
-          </div>
+      <div className="activity-grid">
+        <section className="activity-panel">
+          <header><h2>Recent match history</h2><p>Your latest decided games.</p></header>
+          {stats.recent_matches.length ? <div className="activity-table-wrap" tabIndex={0} role="region" aria-label="Recent match results">
+            <table className="activity-table">
+              <thead><tr><th scope="col">Date</th><th scope="col">Competition</th><th scope="col">Opponent</th><th scope="col">Result</th></tr></thead>
+              <tbody>{stats.recent_matches.map((match, index) => <tr key={`${match.competition_title}-${match.round_number}-${match.table_number}-${index}`}>
+                <td>{match.completed_at ? formatShortDate(match.completed_at) : '—'}</td>
+                <td>{match.competition_title}<small>{match.category_name} · Round {match.round_number}</small></td>
+                <td>{match.opponent_name || 'Bye'}</td>
+                <td><span className={`activity-badge ${match.outcome === 'Win' ? 'activity-highlight' : ''}`}>{match.outcome}</span></td>
+              </tr>)}</tbody>
+            </table>
+          </div> : <p className="activity-empty">Your first result starts the story. No match results yet.</p>}
         </section>
 
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Opponent Record" subtitle="Who you have beaten or lost to most often." />
-          <div className="h-[280px]">
-            <Bar data={opponentData} options={barOptions} />
-          </div>
+        <section className="activity-panel">
+          <header><h2>Achievement records</h2><p>Latest saved standing in each competition category.</p></header>
+          <div className="activity-achievements">{stats.competition_achievements.map((achievement) => <article key={`${achievement.competition_title}-${achievement.category_name}`}>
+            <span className={`activity-badge ${achievement.rank_position === 1 ? 'activity-highlight' : ''}`}>#{achievement.rank_position}</span>
+            <div><h3>{achievement.competition_title}</h3><p>{achievement.category_name} · Round {achievement.round_number}</p></div>
+          </article>)}</div>
+          {!stats.competition_achievements.length && <p className="activity-empty">No standings recorded yet. Play a tournament to get started.</p>}
         </section>
 
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Finishes" subtitle="Placements from saved ranking records." />
-          <div className="h-[280px]">
-            <Bar data={achievementData} options={barOptions} />
-          </div>
+        <section className="activity-panel">
+          <header><h2>Participation trend</h2><p>Monthly registrations · Events and competitions combined</p></header>
+          {stats.monthly_activity.length ? <div className="activity-trend" role="list" aria-label="Monthly registration counts">
+            {stats.monthly_activity.map((item) => <div className="activity-trend-column" role="listitem" key={item.month} aria-label={`${formatMonth(item.month)}: ${item.total} registrations`}>
+              <div className="activity-trend-track"><div className="activity-trend-bar" style={{height: `${item.total / trendMax * 85}%`}}><span>{item.total}</span></div></div>
+              <small>{formatMonth(item.month)}</small>
+            </div>)}
+          </div> : <p className="activity-empty">Your registration trend will appear after you join an activity.</p>}
         </section>
 
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-6">
-          <ChartHeader title="Recent Match History" subtitle="Your latest pairings and results across competitions." />
-          <div className="grid gap-3">
-            {stats.recent_matches.map((match) => (
-              <article key={`${match.competition_title}-${match.round_number}-${match.table_number}-${match.opponent_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <strong className="block text-app-text">{match.competition_title}</strong>
-                    <small className="text-app-muted">{match.category_name} - Round {match.round_number}, Table {match.table_number}</small>
-                  </div>
-                  <span className={match.outcome === 'Win' ? 'status-pill' : match.outcome === 'Loss' ? 'status-pill danger' : 'status-pill warning'}>{match.outcome}</span>
-                </div>
-                <small className="text-app-muted">Opponent: {match.opponent_name || 'Bye'}</small>
-              </article>
-            ))}
-            {stats.recent_matches.length === 0 && <p className="empty-state">No competition results have been recorded yet.</p>}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-6">
-          <ChartHeader title="Achievement Records" subtitle="Your latest recorded standing for each competition category." />
-          <div className="grid gap-3">
-            {stats.competition_achievements.map((achievement) => (
-              <article key={`${achievement.competition_title}-${achievement.category_name}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <strong className="block text-app-text">{achievement.competition_title}</strong>
-                    <small className="text-app-muted">{achievement.category_name} - Round {achievement.round_number}</small>
-                  </div>
-                  <span className="status-pill">#{achievement.rank_position}</span>
-                </div>
-                <dl className="grid grid-cols-3 gap-3 text-sm">
-                  <div><dt className="font-semibold text-app-muted">MMS</dt><dd className="m-0 font-bold text-app-text">{achievement.mms}</dd></div>
-                  <div><dt className="font-semibold text-app-muted">SOS</dt><dd className="m-0 font-bold text-app-text">{achievement.sos}</dd></div>
-                  <div><dt className="font-semibold text-app-muted">Record</dt><dd className="m-0 font-bold text-app-text">{achievement.wins}-{achievement.losses}</dd></div>
-                </dl>
-              </article>
-            ))}
-            {stats.competition_achievements.length === 0 && <p className="empty-state">No ranking records have been saved yet. Results will create standings snapshots.</p>}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-7">
-          <ChartHeader title="My Participation Trend" subtitle="Monthly signups from your own event and competition registrations." />
-          <div className="h-[330px]">
-            <Line data={trendData} options={lineOptions} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-5">
-          <ChartHeader title="My Attendance" subtitle="Present count against your approved registrations." />
-          <div className="grid items-center gap-4 sm:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="h-[220px]">
-              <Doughnut data={attendanceData} options={doughnutOptions} />
-            </div>
-            <div className="grid gap-3">
-              <Insight label="Present" value={String(stats.attended_count)} detail="marked by exco" />
-              <Insight label="Not Marked" value={String(missedApproved)} detail="approved but not present yet" />
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Registration Status" subtitle="Your approval state across activities." />
-          <div className="h-[280px]">
-            <Doughnut data={statusData} options={doughnutOptions} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Activity Mix" subtitle="How your participation splits between CCA events and competitions." />
-          <div className="h-[280px]">
-            <Bar data={typeData} options={barOptions} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Attendance By Type" subtitle="Competition attendance is separated from normal event turnout." />
-          <div className="h-[280px]">
-            <Bar data={attendanceByTypeData} options={barOptions} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-panel xl:col-span-4">
-          <ChartHeader title="Upcoming For Me" subtitle="Only your active registrations are listed here." />
-          <div className="grid gap-3">
-            {stats.upcoming_activities.map((activity) => (
-              <article key={`${activity.activity_type}-${activity.title}-${activity.activity_date}`} className="rounded-xl border border-app-border bg-app-surfaceSoft p-4">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wide text-app-cyan">{activity.activity_type}</span>
-                    <h3 className="m-0 mt-1 text-base font-bold text-app-text">{activity.title}</h3>
-                  </div>
-                  <span className="status-pill">{activity.status}</span>
-                </div>
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="font-semibold text-app-muted">Date</dt>
-                    <dd className="m-0 font-bold text-app-text">{formatDate(activity.activity_date)}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-app-muted">Venue</dt>
-                    <dd className="m-0 font-bold text-app-text">{activity.venue || '-'}</dd>
-                  </div>
-                  {activity.detail && (
-                    <div className="col-span-2">
-                      <dt className="font-semibold text-app-muted">Category</dt>
-                      <dd className="m-0 font-bold text-app-text">{activity.detail}</dd>
-                    </div>
-                  )}
-                </dl>
-              </article>
-            ))}
-            {stats.upcoming_activities.length === 0 && (
-              <p className="empty-state">You have no upcoming event or competition registrations.</p>
-            )}
-          </div>
+        <section className="activity-panel activity-attendance">
+          <header><h2>Attendance</h2><p>Recorded check-ins across your approved activities.</p></header>
+          <div className="activity-attendance-value"><strong>{stats.approved_registrations ? `${stats.attendance_rate}%` : '—'}</strong><span><b>{stats.attended_count} of {stats.approved_registrations}</b><small>marked present</small></span></div>
+          <progress aria-label="Attendance rate" max={100} value={stats.attendance_rate} />
+          <div className="activity-attendance-key"><span>{stats.attended_count} present</span><span>{notMarked} not marked</span></div>
+          <p className="activity-note">Not marked may include upcoming activities.</p>
+          <Link to="/my-events" className="activity-link">Review attendance →</Link>
         </section>
       </div>
+
+      <section className="activity-panel">
+        <header><h2>Upcoming for me</h2><p>Your next chances to play. Check each registration’s status below.</p></header>
+        <div className="activity-upcoming">{stats.upcoming_activities.map((activity, index) => {
+          const date = new Date(activity.activity_date);
+          return <article key={`${activity.activity_type}-${activity.title}-${index}`}>
+            <time dateTime={activity.activity_date} className="activity-date activity-highlight"><strong>{date.toLocaleDateString('en-SG', { day: '2-digit' })}</strong><span>{date.toLocaleDateString('en-SG', { month: 'short' })}</span></time>
+            <div><h3>{activity.title}</h3><p>{formatDateTime(activity.activity_date)} · {activity.venue || 'Venue to be confirmed'}</p><p>{activity.activity_type}{activity.detail ? ` · ${activity.detail}` : ''} · {activity.status}</p><Link className="activity-link" to="/my-events">View my activities →</Link></div>
+          </article>;
+        })}</div>
+        {!stats.upcoming_activities.length && <p className="activity-empty">Nothing coming up yet. <Link className="activity-link" to="/events">Explore club events →</Link></p>}
+      </section>
     </section>
   );
 };

@@ -49,11 +49,7 @@ module.exports.readMemberStats = (req, res) => {
     const stats = results.rows[0];
     return res.status(200).json({
       ...stats,
-      status_breakdown: stats.status_breakdown || [],
-      type_breakdown: stats.type_breakdown || [],
       monthly_activity: stats.monthly_activity || [],
-      exco_contribution_breakdown: stats.exco_contribution_breakdown || [],
-      managed_activity_load: stats.managed_activity_load || [],
       upcoming_activities: stats.upcoming_activities || [],
     });
   });

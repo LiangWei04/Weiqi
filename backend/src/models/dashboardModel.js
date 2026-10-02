@@ -302,15 +302,11 @@ module.exports.selectMemberStats = (data, callback) => {
     ),
     player_matches AS (
       SELECT
-        m.id AS match_id,
-        c.id AS competition_id,
         c.title AS competition_title,
         cc.name AS category_name,
         r.round_number,
         m.table_number,
-        m.result,
         m.completed_at,
-        opponent.id AS opponent_id,
         opponent.name AS opponent_name,
         CASE
           WHEN m.result = 'Bye' THEN 'Bye'
@@ -339,12 +335,6 @@ module.exports.selectMemberStats = (data, callback) => {
         cc.name AS category_name,
         rr.round_number,
         rr.rank_position,
-        rr.mms,
-        rr.sos,
-        rr.sosos,
-        rr.wins,
-        rr.losses,
-        rr.byes,
         rr.recorded_at
       FROM competition_ranking_records rr
       JOIN competitions c ON c.id = rr.competition_id
@@ -353,18 +343,8 @@ module.exports.selectMemberStats = (data, callback) => {
       ORDER BY rr.competition_id, rr.category_id, rr.round_number DESC, rr.recorded_at DESC
     )
     SELECT
-      COUNT(*)::int AS total_registrations,
-      COUNT(*) FILTER (WHERE activity_type = 'Event')::int AS event_registrations,
-      COUNT(*) FILTER (WHERE activity_type = 'Competition')::int AS competition_registrations,
-      COUNT(*) FILTER (WHERE activity_type = 'Event' AND status = 'Registered')::int AS approved_event_registrations,
-      COUNT(*) FILTER (WHERE activity_type = 'Competition' AND status = 'Registered')::int AS approved_competition_registrations,
       COUNT(*) FILTER (WHERE status = 'Registered')::int AS approved_registrations,
-      COUNT(*) FILTER (WHERE status = 'Pending Approval')::int AS pending_registrations,
-      COUNT(*) FILTER (WHERE status = 'Waitlisted')::int AS waitlisted_registrations,
-      COUNT(*) FILTER (WHERE status = 'Rejected')::int AS rejected_registrations,
       COUNT(*) FILTER (WHERE attended = TRUE)::int AS attended_count,
-      COUNT(*) FILTER (WHERE activity_type = 'Event' AND attended = TRUE)::int AS attended_event_count,
-      COUNT(*) FILTER (WHERE activity_type = 'Competition' AND attended = TRUE)::int AS attended_competition_count,
       CASE
         WHEN COUNT(*) FILTER (WHERE status = 'Registered') = 0 THEN 0
         ELSE ROUND(
@@ -372,26 +352,6 @@ module.exports.selectMemberStats = (data, callback) => {
           COUNT(*) FILTER (WHERE status = 'Registered')) * 100
         )::int
       END AS attendance_rate,
-      COUNT(*) FILTER (
-        WHERE activity_date >= CURRENT_DATE
-          AND status IN ('Registered', 'Pending Approval', 'Waitlisted')
-      )::int AS upcoming_count,
-      (
-        SELECT COALESCE(json_agg(status_summary ORDER BY status_summary.status), '[]'::json)
-        FROM (
-          SELECT status, COUNT(*)::int AS total
-          FROM activity_rows
-          GROUP BY status
-        ) status_summary
-      ) AS status_breakdown,
-      (
-        SELECT COALESCE(json_agg(type_summary ORDER BY type_summary.name), '[]'::json)
-        FROM (
-          SELECT activity_type AS name, COUNT(*)::int AS total
-          FROM activity_rows
-          GROUP BY activity_type
-        ) type_summary
-      ) AS type_breakdown,
       (
         SELECT COALESCE(json_agg(month_summary ORDER BY month_summary.month), '[]'::json)
         FROM (
@@ -404,8 +364,6 @@ module.exports.selectMemberStats = (data, callback) => {
       ) AS monthly_activity,
       (SELECT COUNT(*)::int FROM player_matches WHERE outcome IN ('Win', 'Loss')) AS competition_matches_played,
       (SELECT COUNT(*)::int FROM player_matches WHERE outcome = 'Win') AS competition_match_wins,
-      (SELECT COUNT(*)::int FROM player_matches WHERE outcome = 'Loss') AS competition_match_losses,
-      (SELECT COUNT(*)::int FROM player_matches WHERE outcome = 'Bye') AS competition_byes,
       (
         SELECT CASE
           WHEN COUNT(*) FILTER (WHERE outcome IN ('Win', 'Loss')) = 0 THEN 0
@@ -417,127 +375,9 @@ module.exports.selectMemberStats = (data, callback) => {
         FROM player_matches
       ) AS competition_win_rate,
       (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position = 1) AS first_place_count,
-      (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position = 2) AS second_place_count,
-      (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position = 3) AS third_place_count,
-      (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position <= 5) AS top5_count,
       (SELECT COUNT(*)::int FROM latest_rankings WHERE rank_position <= 10) AS top10_count,
-      (SELECT MIN(rank_position)::int FROM latest_rankings) AS best_finish,
       (SELECT COUNT(*)::int FROM events WHERE created_by = $1) AS events_created,
       (SELECT COUNT(*)::int FROM competitions WHERE organizer_id = $1) AS competitions_organized,
-      (SELECT COUNT(*)::int FROM competition_rounds WHERE generated_by = $1) AS rounds_generated,
-      (SELECT COUNT(*)::int FROM event_comments WHERE user_id = $1 AND deleted_at IS NULL) AS comments_posted,
-      (SELECT COUNT(*)::int FROM event_reactions WHERE user_id = $1) AS reactions_made,
-      (SELECT COUNT(*)::int FROM attendance_change_requests WHERE requested_by = $1) AS attendance_requests_made,
-      (SELECT COUNT(*)::int FROM attendance_change_requests WHERE reviewed_by = $1) AS attendance_requests_reviewed,
-      (
-        SELECT COUNT(*)::int
-        FROM event_registrations er
-        JOIN events e ON e.id = er.event_id
-        WHERE e.created_by = $1
-      ) AS managed_event_signups,
-      (
-        SELECT COUNT(*)::int
-        FROM event_registrations er
-        JOIN events e ON e.id = er.event_id
-        WHERE e.created_by = $1
-          AND er.status = 'Pending Approval'
-      ) AS managed_event_pending,
-      (
-        SELECT COUNT(*)::int
-        FROM event_registrations er
-        JOIN events e ON e.id = er.event_id
-        WHERE e.created_by = $1
-          AND er.attended = TRUE
-      ) AS managed_event_attended,
-      (
-        SELECT COUNT(*)::int
-        FROM competition_registrations cr
-        JOIN competition_categories cc ON cc.id = cr.category_id
-        JOIN competitions c ON c.id = cc.competition_id
-        WHERE c.organizer_id = $1
-      ) AS managed_competition_signups,
-      (
-        SELECT COUNT(*)::int
-        FROM competition_registrations cr
-        JOIN competition_categories cc ON cc.id = cr.category_id
-        JOIN competitions c ON c.id = cc.competition_id
-        WHERE c.organizer_id = $1
-          AND cr.status = 'Pending Approval'
-      ) AS managed_competition_pending,
-      (
-        SELECT COUNT(*)::int
-        FROM competition_registrations cr
-        JOIN competition_categories cc ON cc.id = cr.category_id
-        JOIN competitions c ON c.id = cc.competition_id
-        WHERE c.organizer_id = $1
-          AND cr.attended = TRUE
-      ) AS managed_competition_attended,
-      (
-        SELECT COALESCE(json_agg(contribution_summary ORDER BY contribution_summary.sort_order), '[]'::json)
-        FROM (
-          SELECT 'Events Created' AS name, COUNT(*)::int AS total, 1 AS sort_order FROM events WHERE created_by = $1
-          UNION ALL
-          SELECT 'Competitions Organized', COUNT(*)::int, 2 FROM competitions WHERE organizer_id = $1
-          UNION ALL
-          SELECT 'Rounds Generated', COUNT(*)::int, 3 FROM competition_rounds WHERE generated_by = $1
-          UNION ALL
-          SELECT 'Comments Posted', COUNT(*)::int, 4 FROM event_comments WHERE user_id = $1 AND deleted_at IS NULL
-          UNION ALL
-          SELECT 'Reactions Made', COUNT(*)::int, 5 FROM event_reactions WHERE user_id = $1
-          UNION ALL
-          SELECT 'Attendance Reviews', COUNT(*)::int, 6 FROM attendance_change_requests WHERE reviewed_by = $1
-        ) contribution_summary
-      ) AS exco_contribution_breakdown,
-      (
-        SELECT COALESCE(json_agg(load_summary ORDER BY load_summary.activity_type), '[]'::json)
-        FROM (
-          SELECT
-            'Events' AS activity_type,
-            COUNT(er.id)::int AS total_signups,
-            COUNT(er.id) FILTER (WHERE er.status = 'Pending Approval')::int AS pending,
-            COUNT(er.id) FILTER (WHERE er.attended = TRUE)::int AS attended
-          FROM events e
-          LEFT JOIN event_registrations er ON er.event_id = e.id
-          WHERE e.created_by = $1
-          UNION ALL
-          SELECT
-            'Competitions' AS activity_type,
-            COUNT(cr.id)::int AS total_signups,
-            COUNT(cr.id) FILTER (WHERE cr.status = 'Pending Approval')::int AS pending,
-            COUNT(cr.id) FILTER (WHERE cr.attended = TRUE)::int AS attended
-          FROM competitions c
-          LEFT JOIN competition_categories cc ON cc.competition_id = c.id
-          LEFT JOIN competition_registrations cr ON cr.category_id = cc.id
-          WHERE c.organizer_id = $1
-        ) load_summary
-      ) AS managed_activity_load,
-      (
-        SELECT COALESCE(json_agg(result_summary ORDER BY result_summary.sort_order), '[]'::json)
-        FROM (
-          SELECT 'Win' AS status, COUNT(*)::int AS total, 1 AS sort_order FROM player_matches WHERE outcome = 'Win'
-          UNION ALL
-          SELECT 'Loss', COUNT(*)::int, 2 FROM player_matches WHERE outcome = 'Loss'
-          UNION ALL
-          SELECT 'Bye', COUNT(*)::int, 3 FROM player_matches WHERE outcome = 'Bye'
-        ) result_summary
-      ) AS competition_result_breakdown,
-      (
-        SELECT COALESCE(json_agg(opponent_summary ORDER BY opponent_summary.played DESC, opponent_summary.opponent_name), '[]'::json)
-        FROM (
-          SELECT
-            opponent_id,
-            COALESCE(opponent_name, 'Bye') AS opponent_name,
-            COUNT(*) FILTER (WHERE outcome IN ('Win', 'Loss'))::int AS played,
-            COUNT(*) FILTER (WHERE outcome = 'Win')::int AS wins,
-            COUNT(*) FILTER (WHERE outcome = 'Loss')::int AS losses,
-            MAX(completed_at) AS last_played
-          FROM player_matches
-          WHERE opponent_id IS NOT NULL
-          GROUP BY opponent_id, opponent_name
-          ORDER BY COUNT(*) FILTER (WHERE outcome IN ('Win', 'Loss')) DESC, opponent_name
-          LIMIT 8
-        ) opponent_summary
-      ) AS opponent_records,
       (
         SELECT COALESCE(json_agg(match_summary ORDER BY match_summary.completed_at DESC NULLS LAST, match_summary.round_number DESC), '[]'::json)
         FROM (
@@ -561,12 +401,7 @@ module.exports.selectMemberStats = (data, callback) => {
             competition_title,
             category_name,
             round_number,
-            rank_position,
-            mms,
-            sos,
-            sosos,
-            wins,
-            losses
+            rank_position
           FROM latest_rankings
           ORDER BY rank_position, competition_title
           LIMIT 4

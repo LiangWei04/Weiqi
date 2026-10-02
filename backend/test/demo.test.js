@@ -58,6 +58,25 @@ test('member signup, organiser approval and isolated data',async () => {
   assert.equal((await api('/demo/session',b.token)).data.progress.signup,'Not registered');
   assert.equal((await api(`/registrations/${progress.signupRegistration}/approve`,b.token,'PUT',{})).status,403);
 });
+
+test('personal dashboard returns only retained cards and keeps persona data scoped',async () => {
+  const organiser = (await api('/dashboard/member-stats',a.token)).data;
+  assert.deepEqual(Object.keys(organiser).sort(), [
+    'approved_registrations', 'attended_count', 'attendance_rate', 'monthly_activity',
+    'competition_matches_played', 'competition_match_wins', 'competition_win_rate',
+    'first_place_count', 'top10_count', 'events_created', 'competitions_organized',
+    'recent_matches', 'competition_achievements', 'upcoming_activities',
+  ].sort());
+  assert.ok(organiser.events_created > 0);
+  const member = (await api('/demo/persona',a.token,'POST',{persona:'member'})).data;
+  const response = await api('/dashboard/member-stats',member.token);
+  assert.equal(response.status,200);
+  assert.equal(response.data.events_created,0);
+  assert.ok(response.data.competition_matches_played > 0);
+  assert.ok(response.data.recent_matches.length > 0);
+  assert.ok(response.data.monthly_activity.length > 0);
+  assert.equal(response.data.competition_win_rate,Math.round(response.data.competition_match_wins / response.data.competition_matches_played * 100));
+});
 test('attendance decision updates underlying registration and preserves history',async () => {
   assert.equal((await api(`/attendance-requests/${a.records.attendanceRequest}/approve`,a.token,'PUT',{})).status,200);
   const status = (await api('/demo/session',a.token)).data;
