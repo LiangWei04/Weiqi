@@ -185,3 +185,30 @@ table tr:hover td { background: var(--sidebar); }
 .demo-entry-start > a span { margin-left: 10px; }
 @media(min-width:761px) and (max-width:1050px) { .demo-entry .auth-brand, .demo-entry .auth-card { padding: 36px 28px; }.demo-entry-story { margin-top: 64px; }.demo-entry-story strong { font-size: 34px; }.demo-entry-story > p:last-child { font-size: 18px; }.demo-entry-features li { gap: 16px; } }
 @media(max-width:760px) { .demo-entry { padding: 18px; }.demo-entry .auth-brand { min-height: 300px; padding: 28px; background-position: center 64%; }.demo-entry .auth-brand .demo-entry-logo { font-size: 42px; }.demo-entry .auth-card { padding: 32px 24px; gap: 28px; }.demo-entry .auth-card h1 { margin-top: 16px; font-size: 38px; }.demo-entry-intro { font-size: 17px; margin-top: 20px; }.demo-entry-features { gap: 26px; }.demo-entry-features li { gap: 16px; }.demo-entry-features li > span { flex-basis: 42px; height: 42px; border-radius: 14px; }.demo-entry-features strong { font-size: 16px; }.demo-entry-features p { font-size: 14px; } }
+
+/* Keep the desktop welcome comfortably inside a normal browser window. */
+@media(min-width:761px) {
+  .demo-entry { min-height: 100svh; padding: 48px 24px; }
+  .demo-entry .auth-panel { width: min(900px, 100%); gap: 20px; }
+  .demo-entry .auth-brand { padding: 34px 32px 22px; border-radius: 18px; }
+  .demo-entry .auth-brand .demo-entry-logo { font-size: 36px; }
+  .demo-entry-story { margin-top: 58px; }
+  .demo-entry-story strong { font-size: 36px; }
+  .demo-entry-story > p:last-child { margin-top: 24px; max-width: 280px; font-size: 15px; }
+  .demo-entry-caption { padding-top: 180px; font-size: 10px; }
+  .demo-entry .auth-card { padding: 34px; gap: 24px; border-radius: 18px; }
+  .demo-entry .eyebrow { font-size: 9px; margin-bottom: 14px; }
+  .demo-entry .auth-card h1 { margin-top: 18px; font-size: 38px; }
+  .demo-entry-intro { margin-top: 18px; font-size: 14px; }
+  .demo-entry-features { gap: 22px; }
+  .demo-entry-features li { gap: 16px; }
+  .demo-entry-features li > span { flex-basis: 40px; height: 40px; border-radius: 13px; font-size: 10px; }
+  .demo-entry-features strong { font-size: 14px; }
+  .demo-entry-features p { margin-top: 5px; font-size: 12px; }
+  .demo-entry-start { gap: 13px; }
+  .demo-entry-reassurance { font-size: 11px; }
+  .demo-entry-expired { padding: 9px 12px; font-size: 11px; }
+  .demo-entry-start .primary-action { min-height: 44px; font-size: 14px; }
+  .demo-entry-wait { font-size: 11px; }
+  .demo-entry-start > a { margin-top: 6px; font-size: 12px; }
+}
